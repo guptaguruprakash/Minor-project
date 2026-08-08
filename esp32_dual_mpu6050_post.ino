@@ -40,7 +40,7 @@
 // ---------------- USER CONFIG ----------------
 const char* WIFI_SSID     = "Civil_Engineers";
 const char* WIFI_PASSWORD = "Dogladosh@123";
-const char* SERVER_URL    = "http://192.168.18.130:5000/api/sensor-data"; // Flask endpoint
+const char* SERVER_URL    = "http://192.168.18.130:8000/api/sensor-data"; // FastAPI endpoint
 
 #define SENSOR1_ADDR 0x68   // AD0 pin LOW
 #define SENSOR2_ADDR 0x69   // AD0 pin HIGH
