@@ -1,26 +1,28 @@
 # ESP32 FastAPI Collector
 
-This folder contains a small FastAPI app that receives MPU6050 telemetry from the ESP32 sketch and appends each POST to `data/telemetry.jsonl`.
+This folder contains a small FastAPI app that receives labeled MPU6050 telemetry from the ESP32 sketch and appends each POST to [fastapi_api/data/sensor_data_labeled.csv](e:/esp32/fastapi_api/data/sensor_data_labeled.csv).
 
 ## Run
 
 ```bash
+cd fastapi_api
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+python main.py
 ```
 
-If you prefer running from the project root, this also works:
+You can also run it with Uvicorn from the project root:
 
 ```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8080
+cd fastapi_api
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## ESP32 endpoint
 
-Set the ESP32 `API_URL` to:
+Set the ESP32 `SERVER_URL` to:
 
 ```text
-http://YOUR_PC_IP:8080/api/telemetry
+http://YOUR_PC_IP:8000/api/sensor-data
 ```
 
 ## Payload shape
@@ -31,6 +33,6 @@ The endpoint expects:
 - `posture`
 - `user`
 - `samples[]`
-- `samples[].timestamp`
-- `samples[].sensor1.ax`, `ay`, `az`, `gx`, `gy`, `gz`
-- `samples[].sensor2.ax`, `ay`, `az`, `gx`, `gy`, `gz`
+- `samples[].t`
+- `samples[].ax1`, `ay1`, `az1`, `gx1`, `gy1`, `gz1`
+- `samples[].ax2`, `ay2`, `az2`, `gx2`, `gy2`, `gz2`
