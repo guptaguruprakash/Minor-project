@@ -38,9 +38,9 @@
 #define OLED_I2C_ADDR 0x3C
 
 // ---------------- USER CONFIG ----------------
-const char* WIFI_SSID     = "Civil_Engineers";
-const char* WIFI_PASSWORD = "Dogladosh@123";
-const char* SERVER_URL    = "http://192.168.18.130:8000/api/sensor-data"; // FastAPI endpoint
+const char* WIFI_SSID     = "Home_Wifi";
+const char* WIFI_PASSWORD = "P@ssword75";
+const char* SERVER_URL    = "http://192.168.18.105:8000/api/sensor-data"; // FastAPI endpoint
 
 #define SENSOR1_ADDR 0x68   // AD0 pin LOW
 #define SENSOR2_ADDR 0x69   // AD0 pin HIGH
@@ -66,6 +66,9 @@ volatile unsigned long totalSamplesCollected = 0;
 unsigned long lastOledUpdateMs = 0;
 volatile bool collectionEnabled = false;
 volatile bool postFailed = false;
+volatile bool predictionAvailable = false;
+volatile uint8_t latestPrediction = 0;
+volatile uint8_t latestPredictionConfidence = 0;
 
 // ---------------- DATA STRUCTURES ----------------
 struct SensorSample {
@@ -73,6 +76,20 @@ struct SensorSample {
   float ax1, ay1, az1, gx1, gy1, gz1;   // sensor 1 (accel + gyro)
   float ax2, ay2, az2, gx2, gy2, gz2;   // sensor 2 (accel + gyro)
 };
+
+#include "knn_model.h"
+
+uint8_t predictSensorFeatures(const float features[SmartGymKnn::FEATURE_COUNT]);
+const char* knnExerciseName(uint8_t label);
+const char* knnPostureName(uint8_t label);
+
+uint8_t predictSensorSample(const SensorSample& sample) {
+  const float features[SmartGymKnn::FEATURE_COUNT] = {
+    sample.ax1, sample.ay1, sample.az1, sample.gx1, sample.gy1, sample.gz1,
+    sample.ax2, sample.ay2, sample.az2, sample.gx2, sample.gy2, sample.gz2,
+  };
+  return predictSensorFeatures(features);
+}
 
 // Double buffers
 SensorSample bufferA[BUFFER_SIZE];
@@ -82,15 +99,16 @@ SensorSample bufferB[BUFFER_SIZE];
 volatile bool useBufferA   = true;   // which buffer the collector is currently filling
 volatile int  indexA       = 0;
 volatile int  indexB       = 0;
+volatile unsigned long collectionGeneration = 0;
 
 // Handshake between cores
 SemaphoreHandle_t bufferMutex;        // protects the shared bookkeeping above
 QueueHandle_t      uploadQueue;       // holds "ready to upload" buffer descriptors
 WebServer webServer(80);
-
 struct UploadJob {
   SensorSample* data;
   int count;
+  unsigned long generation;
 };
 
 // ---------------- SENSOR OBJECTS ----------------
@@ -216,13 +234,42 @@ void updateOLED(unsigned long collectedCount) {
   oled.println(collectedCount);
   oled.setTextSize(1);
   oled.setCursor(0, 48);
-  oled.print(postFailed ? "POST FAIL " : (collectionEnabled ? "RUN " : "PAUSE "));
-  oled.print(EXERCISE_NAME);
+  if (postFailed) {
+    oled.print("POST FAIL");
+  } else if (!collectionEnabled) {
+    oled.print("PAUSED");
+  } else if (!predictionAvailable) {
+    oled.print("WAITING");
+  } else {
+    oled.print(knnExerciseName(latestPrediction));
+    oled.print(" ");
+    oled.print(knnPostureName(latestPrediction));
+    oled.print(" ");
+    oled.print(latestPredictionConfidence);
+    oled.print("%");
+  }
   oled.display();
 }
 
 void applySessionConfig() {
   Serial.println("Session updated -> user: " + USER_NAME + ", exercise: " + EXERCISE_NAME + ", posture: " + POSTURE_LABEL);
+}
+
+void resetCollection() {
+  collectionEnabled = false;
+
+  xSemaphoreTake(bufferMutex, portMAX_DELAY);
+  indexA = 0;
+  indexB = 0;
+  useBufferA = true;
+  totalSamplesCollected = 0;
+  collectionGeneration++;
+  xQueueReset(uploadQueue);
+  xSemaphoreGive(bufferMutex);
+
+  postFailed = false;
+  predictionAvailable = false;
+  Serial.println("Collection reset; paused at sample 0.");
 }
 
 void handleRoot() {
@@ -238,6 +285,7 @@ void handleRoot() {
   html += "<button type='submit' style='padding:12px 18px'>Start Collection</button>";
   html += "</form>";
   html += "<p><a href='/pause'><button style='padding:12px 18px'>Pause Collection</button></a></p>";
+  html += "<p><a href='/reset' onclick=\"return confirm('Clear the current buffer and reset the sample count to 0?')\"><button style='padding:12px 18px'>Reset Buffer</button></a></p>";
   html += "<p><a href='/status'>View Status JSON</a></p>";
   html += "</body></html>";
   webServer.send(200, "text/html", html);
@@ -268,6 +316,12 @@ void handlePause() {
   webServer.send(302, "text/plain", "Collection paused");
 }
 
+void handleReset() {
+  resetCollection();
+  webServer.sendHeader("Location", "/", true);
+  webServer.send(302, "text/plain", "Collection reset");
+}
+
 void handleStatus() {
   String json = "{";
   json += "\"collection\":\"" + getCollectionState() + "\",";
@@ -284,6 +338,7 @@ void setupWebServer() {
   webServer.on("/", handleRoot);
   webServer.on("/start", handleStart);
   webServer.on("/pause", handlePause);
+  webServer.on("/reset", handleReset);
   webServer.on("/status", handleStatus);
   webServer.begin();
 }
@@ -351,6 +406,7 @@ void collectorTask(void* pvParameters) {
 
     SensorSample* fullBuffer = nullptr;
     int fullCount = 0;
+    unsigned long generationSnapshot = collectionGeneration;
 
     if (useBufferA) {
       bufferA[indexA++] = sample;
@@ -379,7 +435,7 @@ void collectorTask(void* pvParameters) {
 
     // Hand the full buffer off to the uploader task (non-blocking for the collector)
     if (fullBuffer != nullptr) {
-      UploadJob job = { fullBuffer, fullCount };
+      UploadJob job = { fullBuffer, fullCount, generationSnapshot };
       // If the queue is somehow still full (uploader falling behind), drop the
       // oldest pending job rather than stalling collection.
       if (xQueueSend(uploadQueue, &job, 0) != pdTRUE) {
@@ -407,7 +463,11 @@ void uploaderTask(void* pvParameters) {
     // Blocks here until the collector hands off a full buffer -
     // this never touches or slows down data collection.
     if (xQueueReceive(uploadQueue, &job, portMAX_DELAY) == pdTRUE) {
-      postBuffer(job.data, job.count);
+      if (job.generation == collectionGeneration) {
+        postBuffer(job.data, job.count);
+      } else {
+        Serial.println("Skipped upload from a previous collection session.");
+      }
     }
   }
 }
@@ -420,11 +480,37 @@ void postBuffer(SensorSample* data, int count) {
     return;
   }
 
+  uint8_t predictionVotes[SmartGymKnn::LABEL_COUNT] = {};
+  for (int i = 0; i < count; i++) {
+    ++predictionVotes[predictSensorSample(data[i])];
+  }
+
+  uint8_t prediction = 0;
+  for (uint8_t label = 1; label < SmartGymKnn::LABEL_COUNT; label++) {
+    if (predictionVotes[label] > predictionVotes[prediction]) {
+      prediction = label;
+    }
+  }
+  const uint8_t winningVotes = predictionVotes[prediction];
+  const float predictionConfidence = count > 0 ? static_cast<float>(winningVotes) / count : 0.0f;
+  latestPrediction = prediction;
+  latestPredictionConfidence = static_cast<uint8_t>(predictionConfidence * 100.0f);
+  predictionAvailable = true;
+  Serial.printf("KNN: %s / %s (%.0f%%)\n",
+                knnExerciseName(prediction), knnPostureName(prediction), predictionConfidence * 100.0f);
+
   // Build JSON payload
   DynamicJsonDocument doc(16384); // adjust size if BUFFER_SIZE grows
   doc["exercise"] = EXERCISE_NAME;   // e.g. "squat", "pushup", "bicep_curl"
   doc["posture"]  = POSTURE_LABEL;   // "good" or "bad"
   doc["user"]     = USER_NAME;
+  JsonObject livePrediction = doc.createNestedObject("prediction");
+  livePrediction["label"] = SmartGymKnn::labelName(prediction);
+  livePrediction["exercise"] = knnExerciseName(prediction);
+  livePrediction["posture"] = knnPostureName(prediction);
+  livePrediction["confidence"] = predictionConfidence;
+  livePrediction["timestamp"] = count > 0 ? data[count - 1].timestamp : 0;
+  livePrediction["samples"] = count;
   JsonArray samples = doc.createNestedArray("samples");
 
   for (int i = 0; i < count; i++) {
@@ -458,7 +544,7 @@ void postBuffer(SensorSample* data, int count) {
 }
 
 // ---------------- SETUP ----------------
-void setup() {
+void setupDataCollection() {
   Serial.begin(115200);
   delay(500);
 
@@ -491,7 +577,7 @@ void setup() {
   // Nothing else runs in loop(); everything happens in the two tasks above.
 }
 
-void loop() {
+void loopDataCollection() {
   webServer.handleClient();
   vTaskDelay(pdMS_TO_TICKS(10));
 }

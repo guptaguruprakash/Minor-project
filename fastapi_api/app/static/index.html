@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart Gym Live Monitor</title>
+  <style>
+    :root { color-scheme: dark; --ink: #eef2ed; --muted: #9da9a3; --panel: #17201e; --line: #30403b; --lime: #c7f36b; --red: #ff796f; --teal: #64d9c2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 15% 10%, #27433c 0, #101614 42%, #080b0a 100%); color: var(--ink); font: 16px/1.45 Georgia, serif; }
+    main { width: min(1080px, 92vw); margin: 0 auto; padding: 54px 0 42px; }
+    header { display: flex; align-items: end; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--line); padding-bottom: 28px; }
+    h1 { margin: 0; font-size: clamp(2.5rem, 7vw, 5.7rem); line-height: .9; letter-spacing: -.05em; font-weight: 400; }
+    .eyebrow { color: var(--lime); font: 700 12px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .connection { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 700 12px ui-monospace, SFMono-Regular, Consolas, monospace; text-transform: uppercase; white-space: nowrap; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 5px #ff796f1c; }
+    .online .dot { background: var(--teal); box-shadow: 0 0 0 5px #64d9c21c; }
+    .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 18px; margin-top: 28px; }
+    .panel { background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 8px; padding: 26px; }
+    .label { color: var(--muted); font: 700 11px ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .12em; text-transform: uppercase; }
+    .exercise { margin-top: 12px; font-size: clamp(3rem, 9vw, 7.5rem); line-height: .85; text-transform: capitalize; }
+    .posture { display: flex; min-height: 100%; flex-direction: column; justify-content: space-between; }
+    .posture-value { margin-top: 40px; color: var(--lime); font-size: clamp(4.5rem, 12vw, 9rem); line-height: .8; text-transform: uppercase; }
+    .posture-value.bad { color: var(--red); }
+    .meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 28px; color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .bar { height: 10px; margin-top: 12px; overflow: hidden; border-radius: 2px; background: #0b100f; }
+    .bar > i { display: block; width: 0%; height: 100%; background: var(--lime); transition: width .35s ease; }
+    .notice { margin-top: 18px; color: var(--muted); font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    @media (max-width: 700px) { main { padding-top: 30px; } header { align-items: start; flex-direction: column; } .hero { grid-template-columns: 1fr; } .posture { min-height: 300px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><div class="eyebrow">Smart gym assistant / live mode</div><h1>Form<br>check.</h1></div>
+      <div id="connection" class="connection"><i class="dot"></i><span>Waiting for ESP32</span></div>
+    </header>
+    <section class="hero">
+      <article class="panel"><div class="label">Detected exercise</div><div id="exercise" class="exercise">Waiting</div><div class="meta"><span id="label">No prediction yet</span><span id="samples">0 samples</span></div></article>
+      <article class="panel posture"><div><div class="label">Posture</div><div id="posture" class="posture-value">--</div></div><div><div class="meta"><span>Confidence</span><span id="confidence">0%</span></div><div class="bar"><i id="confidenceBar"></i></div></div></article>
+    </section>
+    <p class="notice">The dashboard updates from the latest ESP32 batch. Current training data contains no squat_bad class, so squat posture predictions require additional bad-posture samples for reliable classification.</p>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    async function refresh() {
+      try {
+        const response = await fetch('/api/live-status', { cache: 'no-store' });
+        const data = await response.json();
+        $('connection').classList.toggle('online', data.online);
+        $('connection').querySelector('span').textContent = data.online ? 'ESP32 live' : 'ESP32 offline';
+        $('exercise').textContent = data.online ? data.exercise.replace('_', ' ') : 'Waiting';
+        $('posture').textContent = data.online ? data.posture : '--';
+        $('posture').classList.toggle('bad', data.posture === 'bad');
+        $('label').textContent = data.online ? data.label : 'No prediction yet';
+        $('samples').textContent = `${data.samples || 0} samples`;
+        const confidence = Math.round((data.confidence || 0) * 100);
+        $('confidence').textContent = `${confidence}%`;
+        $('confidenceBar').style.width = `${confidence}%`;
+      } catch (error) {
+        $('connection').classList.remove('online');
+        $('connection').querySelector('span').textContent = 'API unavailable';
+      }
+    }
+    refresh();
+    setInterval(refresh, 500);
+  </script>
+</body>
+</html>

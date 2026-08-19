@@ -30,9 +30,10 @@ import re
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -56,6 +57,17 @@ app = FastAPI(title="Smart Gym Labeled Sensor Data API", lifespan=lifespan)
 
 # A lock so concurrent POSTs never interleave writes to the same file
 csv_lock = threading.Lock()
+live_lock = threading.Lock()
+latest_live_prediction = {
+    "online": False,
+    "exercise": "unknown",
+    "posture": "unknown",
+    "label": "unknown",
+    "confidence": 0.0,
+    "timestamp": 0,
+    "samples": 0,
+    "received_at": None,
+}
 
 
 def get_csv_path() -> str:
@@ -91,6 +103,7 @@ class SensorBatch(BaseModel):
     posture: str
     user: str
     samples: List[SensorSample]
+    prediction: Optional[dict] = None
 
 
 def ensure_csv_exists():
@@ -124,6 +137,19 @@ def receive_sensor_data(batch: SensorBatch):
                     s.ax2, s.ay2, s.az2, s.gx2, s.gy2, s.gz2,
                 ])
 
+    if batch.prediction:
+        with live_lock:
+            latest_live_prediction.update({
+                "online": True,
+                "exercise": str(batch.prediction.get("exercise", "unknown")),
+                "posture": str(batch.prediction.get("posture", "unknown")),
+                "label": str(batch.prediction.get("label", "unknown")),
+                "confidence": float(batch.prediction.get("confidence", 0.0)),
+                "timestamp": int(batch.prediction.get("timestamp", 0)),
+                "samples": int(batch.prediction.get("samples", len(batch.samples))),
+                "received_at": datetime.now(timezone.utc).isoformat(),
+            })
+
     return {
         "status": "success",
         "samples_stored": len(batch.samples),
@@ -132,7 +158,20 @@ def receive_sensor_data(batch: SensorBatch):
         "posture": batch.posture,
         "label": label,
         "file": os.path.basename(csv_path),
+        "prediction": batch.prediction,
     }
+
+
+@app.get("/api/live-status")
+def get_live_status():
+    with live_lock:
+        status = dict(latest_live_prediction)
+
+    received_at = status["received_at"]
+    if received_at:
+        received_time = datetime.fromisoformat(received_at)
+        status["online"] = (datetime.now(timezone.utc) - received_time).total_seconds() < 3.0
+    return status
 
 
 @app.get("/api/sensor-data/summary")
@@ -158,10 +197,6 @@ def get_label_summary():
     return {"total": total, "by_label": counts}
 
 
-@app.get("/")
+@app.get("/", response_class=FileResponse)
 def root():
-    return {
-        "message": "Smart Gym Labeled Sensor Data API is running.",
-        "endpoint": "/api/sensor-data",
-        "expected_fields": ["exercise (squat|pushup|bicep_curl)", "posture (good|bad)", "user", "samples[]"],
-    }
+    return FileResponse(os.path.join(BASE_DIR, "static", "index.html"))
