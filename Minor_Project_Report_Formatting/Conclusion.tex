@@ -1,0 +1,9 @@
+\chapter{CONCLUSION}
+
+The Smart Gym Assistant combines wearable motion sensing, embedded machine learning, wireless communication, and a web interface into one exercise-monitoring system. Two MPU6050 sensors connected to the ESP32 provide synchronized acceleration and gyroscope data. The embedded KNN classifier uses the twelve sensor values to identify the current bicep movement state, while the OLED provides immediate local feedback.
+
+The FastAPI service complements the embedded system by receiving sensor batches, storing labeled samples, accepting live predictions, and presenting the latest status through a browser dashboard. The use of double buffering helps separate fixed-rate data collection from comparatively slower network transmission. This makes the design suitable for experiments in real-time posture monitoring without requiring continuous cloud processing.
+
+The present implementation is a working prototype. Its deployed model contains three bicep-related labels, while the available data collection interface can be used to collect additional exercise classes. The accuracy of the final system depends on sensor placement, user variation, dataset balance, and the quality of the recorded labels. Future work should therefore include a larger and more diverse dataset, independent test evaluation, repetition counting, and additional exercises such as squats and push-ups.
+
+Overall, the project demonstrates how low-cost inertial sensors and edge machine learning can support practical fitness-assistance applications. It provides a foundation for a more complete coaching system that can give immediate posture feedback while retaining sensor data for later analysis and model improvement.

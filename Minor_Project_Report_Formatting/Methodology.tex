@@ -1,0 +1,21 @@
+\chapter{METHODOLOGY}
+\section{Overview}
+The system is implemented in four stages: sensor acquisition, model training, embedded inference, and server-side monitoring. The ESP32 reads both sensors at a fixed interval and places samples into alternating memory buffers. When one buffer is full, it is handed to the upload task while the collector continues using the other buffer.
+
+\section{Hardware Design}
+The two MPU6050 modules are connected to the ESP32 through I2C. Their AD0 pins are configured so that the first sensor uses address \texttt{0x68} and the second uses address \texttt{0x69}. An SH1106 OLED is connected to display collection state, sample count, prediction, posture, and confidence. The ESP32 uses Wi-Fi to communicate with the computer running FastAPI.
+
+\section{Data Collection and Preparation}
+Each sample contains a timestamp and twelve sensor values. During collection, the sample is tagged with the exercise, posture, and user name. The FastAPI endpoint validates the JSON structure and appends valid batches to \texttt{sensor\_data\_labeled.csv}. The Python training script reads the labeled CSV, groups rows by label, selects a maximum of 64 evenly distributed prototypes per label, and calculates the mean and standard deviation for each feature.
+
+\section{Model Training and Deployment}
+The standardized prototypes and labels are written to \texttt{knn\_model.h}. During inference, the ESP32 standardizes the incoming twelve-feature vector using the stored means and scales. It calculates the squared Euclidean distance to each embedded prototype, keeps the five nearest prototypes, and returns the majority label. The current deployed labels are \texttt{bicep\_bad}, \texttt{bicep\_good}, and \texttt{bicep\_idle\_good}.
+
+\section{FastAPI Integration}
+The server exposes an endpoint for batched sensor data and another endpoint for live prediction updates. Collection-mode batches are stored in CSV format, while live prediction messages update an in-memory status object. The dashboard reads this status and reports the exercise, posture, confidence, number of samples, and online state.
+
+\section{Testing Procedure}
+Testing consists of checking sensor initialization, confirming that both I2C addresses respond, verifying KNN label output for recorded samples, checking JSON transmission from the ESP32, and confirming that the server stores valid collection batches. Model evaluation should use a separate test portion of the data; the generator's prototype self-check alone is not a sufficient estimate of generalization accuracy.
+
+
+

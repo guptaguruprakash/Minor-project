@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  --ink: #eef4ed;
+  --muted: #93a39b;
+  --panel: rgba(20, 33, 29, 0.86);
+  --line: #2b4039;
+  --lime: #c7f36b;
+  --mint: #72e0c4;
+  --red: #ff786d;
+  --void: #080d0c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, rgba(30, 66, 53, 0.34), transparent 37%),
+    radial-gradient(circle at 82% 10%, rgba(113, 208, 163, 0.13), transparent 27%),
+    var(--void);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.25;
+  background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  content: '';
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+button, input { font: inherit; }
+.shell { width: min(1120px, 91vw); margin: 0 auto; padding: 56px 0 34px; }
+.topbar { display: flex; align-items: end; justify-content: space-between; gap: 28px; padding-bottom: 30px; border-bottom: 1px solid var(--line); animation: rise .7s ease both; }
+.brand-lockup { display: grid; gap: 14px; }
+.eyebrow, .section-label, .mode, .connection, .card-footer, .live-caption, .telemetry-row, .footer-note, .refresh-indicator { font-family: 'DM Mono', monospace; }
+.eyebrow { color: var(--lime); font-size: 11px; letter-spacing: .16em; }
+h1 { margin: 0; font-size: clamp(4rem, 10vw, 8.6rem); font-weight: 500; line-height: .76; letter-spacing: -.085em; }
+h1 em { color: var(--lime); font-style: normal; }
+.status-stack { display: grid; justify-items: end; gap: 9px; padding-bottom: 3px; }
+.connection { display: flex; align-items: center; gap: 10px; color: var(--red); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; }
+.connection.is-online { color: var(--mint); }
+.status-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 13%, transparent); }
+.connection.is-online .status-dot { animation: blink 1.8s ease-in-out infinite; }
+.mode { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.hero-grid, .lower-grid { display: grid; gap: 18px; }
+.hero-grid { grid-template-columns: 1.12fr .88fr; margin-top: 28px; }
+.lower-grid { grid-template-columns: .92fr 1.08fr; margin-top: 18px; }
+.surface { border: 1px solid var(--line); background: var(--panel); box-shadow: 0 20px 60px rgba(0,0,0,.16); backdrop-filter: blur(12px); }
+.surface { border-radius: 8px; padding: 27px; animation: rise .7s ease both; }
+.posture-card { animation-delay: .08s; }
+.signal-card, .dataset-card { animation-delay: .16s; }
+.card-heading, .card-footer, .telemetry-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.section-label { color: var(--muted); font-size: 11px; letter-spacing: .13em; text-transform: uppercase; }
+.pulse-mark { width: 8px; height: 8px; border: 1px solid var(--lime); border-radius: 50%; box-shadow: 0 0 0 5px rgba(199,243,107,.08); }
+.exercise-card h2, .posture-card h2 { margin: 55px 0 62px; overflow-wrap: anywhere; font-size: clamp(3.8rem, 9vw, 8.6rem); font-weight: 500; line-height: .76; letter-spacing: -.08em; text-transform: capitalize; }
+.posture-card { display: flex; min-height: 355px; flex-direction: column; justify-content: space-between; }
+.posture-card h2 { margin: 52px 0 24px; color: var(--lime); font-size: clamp(3rem, 7vw, 6rem); text-transform: uppercase; }
+.posture-card.is-bad h2 { color: var(--red); }
+.card-footer { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+.card-footer strong { color: var(--ink); font-weight: 500; }
+.confidence-block { display: grid; gap: 12px; }
+.confidence-track, .dataset-track { height: 9px; overflow: hidden; background: #0b1311; }
+.confidence-track span, .dataset-track span { display: block; height: 100%; background: var(--lime); transition: width .4s ease; }
+.posture-card.is-bad .confidence-track span { background: var(--red); }
+.signal-card { display: grid; gap: 0; }
+.live-caption { color: var(--mint); font-size: 11px; }
+.telemetry-row { padding: 15px 0; color: var(--muted); font-size: 12px; border-bottom: 1px solid rgba(43,64,57,.65); text-transform: uppercase; }
+.telemetry-row strong { color: var(--ink); font-weight: 400; }
+.dataset-card { display: grid; gap: 17px; }
+.dataset-card > .card-heading { padding-bottom: 6px; }
+.dataset-card > .card-heading strong { color: var(--lime); font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 400; }
+.dataset-row { display: grid; gap: 8px; }
+.dataset-row > div:first-child { display: flex; justify-content: space-between; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; text-transform: uppercase; }
+.dataset-row strong { color: var(--ink); font-weight: 400; }
+.dataset-track { height: 5px; }
+.dataset-track span { background: var(--mint); }
+.empty-state, .footer-note { color: var(--muted); font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.6; }
+.empty-state { margin: 16px 0 0; }
+.footer-note { max-width: 700px; margin: 28px 0 0; }
+.refresh-indicator { position: fixed; right: 22px; bottom: 18px; color: #547067; font-size: 10px; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink { 50% { opacity: .35; } }
+
+@media (max-width: 720px) {
+  .shell { padding-top: 30px; }
+  .topbar { align-items: start; flex-direction: column; }
+  .status-stack { justify-items: start; }
+  .hero-grid, .lower-grid { grid-template-columns: 1fr; }
+  .exercise-card h2 { margin: 47px 0 55px; }
+  .posture-card { min-height: 300px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

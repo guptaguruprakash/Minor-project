@@ -1,0 +1,28 @@
+\pagenumbering{arabic}
+\chapter{INTRODUCTION}
+\section{Background}
+Exercise quality is affected by posture, movement range, and consistency. In a gym environment, beginners may perform an exercise incorrectly without receiving immediate feedback. Human supervision can address this problem, but it is not always available. A wearable sensing system can provide a low-cost alternative by measuring body motion and identifying movement patterns.
+
+This project develops a Smart Gym Assistant using an ESP32 and two MPU6050 sensors. Each MPU6050 provides three-axis acceleration and three-axis gyroscope data. The combined twelve-dimensional sensor vector is classified by a K-nearest neighbors (KNN) model deployed directly on the ESP32. A FastAPI application receives sensor data and live predictions over Wi-Fi and displays the latest exercise state in a browser dashboard.
+
+
+\section{Gap Identification}
+Many exercise-monitoring solutions depend on camera-based pose estimation or continuous cloud processing. Camera systems can raise privacy concerns and may be affected by lighting and occlusion. Cloud-based systems also add network delay and require a reliable connection for every prediction. There is a need for a compact system that can perform basic classification locally while still providing a convenient way to collect data and monitor results.
+
+The proposed system addresses this gap by combining wearable inertial sensing with edge inference. The ESP32 performs the prediction locally, while the server is used for data collection, visualization, and future model improvement. The current prototype is focused on bicep movement states and is designed to be extensible to other exercises.
+
+\section{Motivation}
+The motivation of this project is to make exercise feedback more accessible using inexpensive hardware and an interpretable machine-learning method. KNN is suitable for the prototype because it is simple to train, can work with a small labeled dataset, and can be embedded as a compact collection of prototypes. Using two sensors also provides motion information from more than one body location, which can improve discrimination between similar movements.
+
+\section{Objectives}
+\begin{itemize}
+  \item To collect acceleration and gyroscope data using two MPU6050 sensors.
+  \item To classify bicep movement and posture using an embedded KNN model.
+  \item To provide immediate prediction feedback through an OLED display.
+  \item To transmit sensor batches and predictions from the ESP32 to a FastAPI server.
+  \item To store labeled sensor data for future training and evaluation.
+  \item To provide a live browser-based monitoring interface.
+\end{itemize}
+
+\section{Scope}
+The scope of the current prototype includes dual-sensor data acquisition, local classification of three bicep movement states, Wi-Fi communication, CSV data storage, and live status visualization. Medical diagnosis, complete athletic assessment, and guaranteed injury prevention are outside the scope of this project.

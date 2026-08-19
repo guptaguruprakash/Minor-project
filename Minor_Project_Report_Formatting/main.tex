@@ -1,0 +1,120 @@
+%----------------------------------------------------------------------
+%	REQUIRED PACKAGES
+%----------------------------------------------------------------------
+\documentclass[12pt]{report}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{url}
+\usepackage{caption}
+\usepackage{setspace}
+\usepackage{tocloft}
+
+%----------------------------------------------------------------------
+%	FONTS,INDENTATION, MARGINS, LINE SPACING
+%----------------------------------------------------------------------
+\usepackage{times}      % Loads the Times-Roman Fonts
+\usepackage{mathptmx}   % Loads the Times-Roman Math Fonts
+\usepackage[left=3.81cm,
+            right=2.54cm,
+		top=2.54cm,
+		bottom=2.54cm,
+		a4paper]{geometry}
+  
+\setlength{\parindent}{0pt} % Remove paragraph indent globally
+\usepackage{setspace} %package for line spacing
+\setstretch{1.5}
+\usepackage{parskip}
+\setlength{\parskip}{6pt}  % Adjust paragraph spacing as needed
+
+%----------------------------------------------------------------------
+%	TITLES,SECTIONS,SUBSECTIONS AND SUBSUBSECTIONS
+%----------------------------------------------------------------------
+\usepackage{titlesec}
+\titlespacing{\chapter}{0pt}{-24pt}{12pt}
+\titlespacing{\section}{0pt}{16pt}{16pt}
+\titlespacing{\subsection}{0pt}{16pt}{16pt}
+\titlespacing{\subsubsection}{0pt}{16pt}{16pt}
+
+\titleformat{\chapter}[display]{\centering\fontsize{14pt}{12pt}\bfseries}{\MakeUppercase{\chaptertitlename\ \thechapter}}{12pt}{}
+\titleformat{\section}{\fontsize{12pt}{16pt}\bfseries\raggedright}{\thesection}{0.5em}{}
+\titleformat{\subsection}{\fontsize{12pt}{16pt}\bfseries\raggedright}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\fontsize{12pt}{16pt}\bfseries\raggedright}{\thesubsubsection}{0.5em}{}
+\titleformat{\paragraph}{\fontsize{12pt}{0pt}\bfseries\raggedright}{\theparagraph}{0.5em}{}
+
+%----------------------------------------------------------------------
+%	FORMATTING THE TABLE OF CONTENTS,LOF AND LOT
+%----------------------------------------------------------------------
+
+% Adjust the spacing for the TABLE OF CONTENT
+\renewcommand{\cftbeforetoctitleskip}{-18pt} % Space before the TOC title
+\renewcommand{\cftaftertoctitleskip}{12pt} % Space after the TOC title
+\renewcommand{\cftbeforechapskip}{9pt} % Space before each chapter entry
+\renewcommand{\cftbeforesecskip}{9pt} % Space before each section entry
+\renewcommand{\cftbeforesubsecskip}{9pt} % Space before each section entry
+\renewcommand{\contentsname}{\fontsize{14}{16}\bfseries TABLE OF CONTENTS}
+
+% Adjust the spacing for the LIST OF FIGURES
+\renewcommand{\cftbeforeloftitleskip}{-18pt} % Space before the LOF title
+\renewcommand{\cftafterloftitleskip}{12pt} % Space after the LOF title
+\renewcommand{\cftbeforefigskip}{10pt} % Space before each figure entry
+\renewcommand{\listfigurename}{\fontsize{14}{16}\bfseries LIST OF FIGURES}
+\renewcommand{\cftfigpresnum}{\figurename\ }
+\renewcommand{\cftfigaftersnum}{:}
+\renewcommand{\cftfigaftersnumb}{\hspace{2.5em}} 
+
+% Adjust the spacing for the LIST OF TABLES
+\renewcommand{\cftbeforelottitleskip}{-18pt} % Space before the LOT title
+\renewcommand{\cftafterlottitleskip}{12pt} % Space after the LOT title
+\renewcommand{\cftbeforetabskip}{10pt} % Space before each table entry
+\renewcommand{\listtablename}{\fontsize{14}{16}\bfseries LIST OF TABLES}
+\renewcommand{\cfttabpresnum}{Table\ }
+\renewcommand{\cfttabaftersnum}{:}
+\renewcommand{\cfttabaftersnumb}{\hspace{2.5em}}
+
+%----------------------------------------------------------------------
+%	END OF PREAMLBE AND BEGINNING OF THE DOCUMENT
+%----------------------------------------------------------------------
+
+\begin{document}
+
+\include{CoverPage}
+%\include{TitlePage}
+%\include{Copyright}
+%\include{Declaration}
+%\include{Recommendation}
+%\include{DeptAcceptance}
+\include{Acknowledgement}
+\include{Abstract}
+{\centering{\tableofcontents}}\newpage
+{\centering\listoffigures\addcontentsline{toc}{chapter}{LIST OF FIGURES}}
+\newpage
+{\centering\listoftables\addcontentsline{toc}{chapter}{LIST OF TABLES}}
+\newpage
+\include{ListofAbbreviations}
+\include{Introduction}
+\include{RelatedTheory}
+\include{LiteratureReview}
+\include{Methodology}
+\include{ExpectedResults}
+\include{Conclusion}
+\include{References}
+\include{Appendix}
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+
+

@@ -16,6 +16,16 @@ The current model produces three labels: `bicep_bad`, `bicep_good`, and `bicep_i
 
 ## Live monitor
 
+The live monitor is a React/Vite frontend built into `fastapi_api/app/static`, which FastAPI serves at `/`. After changing the React source, rebuild it from the frontend directory:
+
+```bash
+cd fastapi_api/frontend
+npm install
+npm run build
+```
+
+For frontend-only development, run `npm run dev` from `fastapi_api/frontend`. Vite proxies `/api` requests to the FastAPI server at `http://127.0.0.1:8000`.
+
 `model.ino` owns the firmware `setup()` and `loop()` plus the KNN adapter. `esp32_dual_mpu6050_post.ino` supplies the sensor collection, buffering, and upload functions. Keep both files in the same Arduino sketch folder; Arduino combines `.ino` tabs when compiling.
 
 Each upload includes a majority-vote prediction under `prediction`. Start the API and open `http://127.0.0.1:8000/` to view the live exercise, posture, confidence, and ESP32 connection state:

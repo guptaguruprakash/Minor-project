@@ -1,0 +1,9 @@
+\chapter{LITERATURE REVIEW}
+
+Wearable exercise-monitoring systems commonly use inertial sensors because they are inexpensive, portable, and less sensitive to lighting and camera occlusion than vision-based systems. Accelerometers are useful for detecting changes in linear motion, while gyroscopes provide information about rotation. Combining both measurements gives a richer description of exercise movement.
+
+Machine-learning methods have also been applied to activity and posture recognition. KNN is an attractive method for small embedded prototypes because training is straightforward and the classification rule is easy to interpret. Its main limitations are the need to retain representative samples and the effect of feature scaling on distance calculations. These limitations are addressed here by selecting a bounded number of prototypes per label and standardizing every feature.
+
+Cloud and web-connected fitness systems simplify storage and visualization, but network dependence can introduce delay and privacy concerns. The architecture in this project separates responsibilities: the ESP32 performs immediate classification, and the FastAPI service stores data and exposes monitoring functions. This approach combines the responsiveness of edge processing with the convenience of a web interface.
+
+The reviewed approaches motivate a dual-MPU6050, edge-KNN design for the prototype. Future evaluation should compare KNN with other classifiers using a separate test set and should measure accuracy across different users and sensor placements.

@@ -115,6 +115,25 @@ def ensure_csv_exists():
         with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(CSV_HEADERS)
+        return
+
+    with open(csv_path, mode="r", newline="", encoding="utf-8") as f:
+        rows = list(csv.reader(f))
+
+    normalized_rows = [
+        [cell.lstrip("\ufeff") for cell in row]
+        for row in rows
+    ]
+    cleaned_rows = [
+        row for index, row in enumerate(normalized_rows)
+        if index == 0 or row != CSV_HEADERS
+    ]
+
+    if not cleaned_rows or cleaned_rows[0] != CSV_HEADERS or cleaned_rows != rows:
+        with open(csv_path, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(CSV_HEADERS)
+            writer.writerows(cleaned_rows[1:])
 
 
 @app.post("/api/sensor-data")
@@ -232,15 +251,22 @@ def get_label_summary():
 
     counts = {}
     total = 0
+    skipped = 0
     for csv_path in csv_files:
         with open(csv_path, mode="r", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
+            if not reader.fieldnames or "label" not in reader.fieldnames:
+                skipped += 1
+                continue
             for row in reader:
-                label = row["label"]
+                label = (row.get("label") or "").strip()
+                if not label:
+                    skipped += 1
+                    continue
                 counts[label] = counts.get(label, 0) + 1
                 total += 1
 
-    return {"total": total, "by_label": counts}
+    return {"total": total, "by_label": counts, "skipped": skipped}
 
 
 @app.get("/", response_class=FileResponse)

@@ -1,0 +1,19 @@
+\chapter{RELATED THEORY}
+\section{Inertial Measurement Unit}
+An inertial measurement unit measures motion using accelerometers and gyroscopes. An accelerometer measures specific force along the three axes, while a gyroscope measures angular velocity. The MPU6050 combines both sensing functions in one device and communicates with the ESP32 through the I2C bus \cite{invensense_mpu6050}. Two devices can share the same bus when they use different I2C addresses, in this project \texttt{0x68} and \texttt{0x69}.
+
+\section{Feature Representation}
+For every sample, the system records six values from each sensor:
+\[
+\mathbf{x} = [a_{x1},a_{y1},a_{z1},g_{x1},g_{y1},g_{z1},a_{x2},a_{y2},a_{z2},g_{x2},g_{y2},g_{z2}].
+\]
+The twelve values form the input feature vector. Since acceleration and angular velocity have different numerical ranges, the training script standardizes each feature using its mean and scale before calculating distances.
+
+\section{K-Nearest Neighbors}
+KNN classifies an unknown sample by finding the $k$ training samples with the smallest distance. The class receiving the majority of votes is returned as the prediction \cite{murphy2022}. This project uses $k=5$ and Euclidean distance over standardized features. The trained prototypes, feature means, feature scales, and labels are generated as a C++ header and stored in ESP32 program memory.
+
+\section{Edge Computing and REST Communication}
+Edge computing performs processing near the data source. In this project, the ESP32 performs prediction locally so that feedback does not depend on a server response \cite{espressif_esp32}. The FastAPI application provides REST endpoints for receiving sensor batches and live predictions \cite{fastapi}. The browser dashboard requests the latest status and marks the ESP32 offline when no recent update has been received.
+
+
+

@@ -1,0 +1,15 @@
+\chapter{EXPECTED RESULTS}
+
+The completed prototype is expected to produce the following results:
+\begin{itemize}
+	\item Both MPU6050 sensors initialize successfully using their separate I2C addresses.
+	\item The ESP32 collects motion samples at approximately 50 Hz.
+	\item The embedded KNN model returns one of the three deployed bicep movement labels.
+	\item The OLED displays the current collection state and latest prediction.
+	\item The FastAPI server receives valid batches over Wi-Fi without corrupting CSV rows.
+	\item The browser dashboard displays the latest exercise, posture, confidence, and connection state.
+	\item Recorded data can be reused to regenerate the embedded model after additional labeling.
+\end{itemize}
+
+The final accuracy should be reported from an independent test set collected under different repetitions and, where possible, from more than one user. A numerical accuracy value is intentionally not claimed here until that test is performed.
+
