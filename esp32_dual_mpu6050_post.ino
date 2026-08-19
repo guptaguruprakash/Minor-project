@@ -41,6 +41,8 @@
 const char* WIFI_SSID     = "Home_Wifi";
 const char* WIFI_PASSWORD = "P@ssword75";
 const char* SERVER_URL    = "http://192.168.18.105:8000/api/sensor-data"; // FastAPI endpoint
+// FIX: Live mode publishes only the KNN result, never the sensor batch.
+const char* LIVE_RESULT_URL = "http://192.168.18.105:8000/api/live-prediction";
 
 #define SENSOR1_ADDR 0x68   // AD0 pin LOW
 #define SENSOR2_ADDR 0x69   // AD0 pin HIGH
@@ -58,6 +60,8 @@ const char* SERVER_URL    = "http://192.168.18.105:8000/api/sensor-data"; // Fas
 String EXERCISE_NAME = "squat";
 String POSTURE_LABEL = "good";
 String USER_NAME = "Birendra";
+// FIX: Keep the operating mode separate from network connectivity.
+String OPERATION_MODE = "live";
 
 // ---------------- OLED DISPLAY ----------------
 Adafruit_SH1106G oled(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
@@ -79,7 +83,7 @@ struct SensorSample {
 
 #include "knn_model.h"
 
-uint8_t predictSensorFeatures(const float features[SmartGymKnn::FEATURE_COUNT]);
+uint8_t predictSensorFeatures(const float* features);
 const char* knnExerciseName(uint8_t label);
 const char* knnPostureName(uint8_t label);
 
@@ -114,6 +118,28 @@ struct UploadJob {
 // ---------------- SENSOR OBJECTS ----------------
 Adafruit_MPU6050 mpu1;
 Adafruit_MPU6050 mpu2;
+
+// FIX: Declare functions explicitly because they are called before their definitions.
+void updateOLED(unsigned long collectedCount);
+void applySessionConfig();
+void resetCollection();
+void handleRoot();
+void handleStart();
+void handleLive();
+void handleCollect();
+void handlePause();
+void handleReset();
+void handleStatus();
+void setupWebServer();
+void checkSerialForLabelUpdate();
+void collectorTask(void* pvParameters);
+void uploaderTask(void* pvParameters);
+void updateKnnPrediction(SensorSample* data, int count);
+void publishLivePrediction(int count);
+void postBuffer(SensorSample* data, int count);
+bool setupSensors();
+bool setupOLED();
+void connectWiFi();
 
 // ---------------- WIFI SETUP ----------------
 void showOLEDMessage(const String& line1, const String& line2 = "", const String& line3 = "", uint8_t textSize = 1) {
@@ -276,8 +302,14 @@ void handleRoot() {
   String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>";
   html += "<title>ESP32 Collector</title></head><body style='font-family:Arial;padding:20px'>";
   html += "<h2>ESP32 Collector</h2>";
+  html += "<p>Mode: <b>" + OPERATION_MODE + "</b></p>";
   html += "<p>Status: <b>" + getCollectionState() + "</b></p>";
   html += "<p>Collected samples: <b>" + String(totalSamplesCollected) + "</b></p>";
+  html += "<p>KNN posture: <b>";
+  html += predictionAvailable ? knnPostureName(latestPrediction) : "waiting";
+  html += "</b> (" + String(latestPredictionConfidence) + "%)</p>";
+  html += "<p><a href='/live'><button style='padding:12px 18px'>Live Mode</button></a> ";
+  html += "<a href='/collect'><button style='padding:12px 18px'>Data Collection Mode</button></a></p>";
   html += "<form action='/start' method='get' style='display:grid;gap:10px;max-width:320px'>";
   html += "<label>Exercise name<input name='exercise' value='" + EXERCISE_NAME + "' style='width:100%'></label>";
   html += "<label>Posture label<input name='posture' value='" + POSTURE_LABEL + "' style='width:100%'></label>";
@@ -309,6 +341,24 @@ void handleStart() {
   webServer.send(302, "text/plain", "Collection started");
 }
 
+void handleLive() {
+  // FIX: Selecting a mode does not start sampling or POST uploads.
+  OPERATION_MODE = "live";
+  postFailed = false;
+  collectionEnabled = false;
+  webServer.sendHeader("Location", "/", true);
+  webServer.send(302, "text/plain", "Live mode enabled");
+}
+
+void handleCollect() {
+  // FIX: Select data collection mode without starting sampling or POST uploads.
+  OPERATION_MODE = "data_collection";
+  postFailed = false;
+  collectionEnabled = false;
+  webServer.sendHeader("Location", "/", true);
+  webServer.send(302, "text/plain", "Data collection mode enabled");
+}
+
 void handlePause() {
   collectionEnabled = false;
   postFailed = false;
@@ -325,10 +375,15 @@ void handleReset() {
 void handleStatus() {
   String json = "{";
   json += "\"collection\":\"" + getCollectionState() + "\",";
+  json += "\"mode\":\"" + OPERATION_MODE + "\",";
   json += "\"samples_collected\":" + String(totalSamplesCollected) + ",";
   json += "\"user\":\"" + USER_NAME + "\",";
   json += "\"exercise\":\"" + EXERCISE_NAME + "\",";
   json += "\"posture\":\"" + POSTURE_LABEL + "\",";
+  json += "\"knn_posture\":\"";
+  json += predictionAvailable ? knnPostureName(latestPrediction) : "unknown";
+  json += "\",";
+  json += "\"knn_confidence\":" + String(latestPredictionConfidence) + ",";
   json += "\"post_failed\":" + String(postFailed ? "true" : "false");
   json += "}";
   webServer.send(200, "application/json", json);
@@ -337,6 +392,8 @@ void handleStatus() {
 void setupWebServer() {
   webServer.on("/", handleRoot);
   webServer.on("/start", handleStart);
+  webServer.on("/live", handleLive);
+  webServer.on("/collect", handleCollect);
   webServer.on("/pause", handlePause);
   webServer.on("/reset", handleReset);
   webServer.on("/status", handleStatus);
@@ -454,8 +511,6 @@ void collectorTask(void* pvParameters) {
 // =================================================================
 // CORE 1 TASK: Upload full buffers via HTTP POST
 // =================================================================
-void postBuffer(SensorSample* data, int count);
-
 void uploaderTask(void* pvParameters) {
   UploadJob job;
 
@@ -464,7 +519,12 @@ void uploaderTask(void* pvParameters) {
     // this never touches or slows down data collection.
     if (xQueueReceive(uploadQueue, &job, portMAX_DELAY) == pdTRUE) {
       if (job.generation == collectionGeneration) {
-        postBuffer(job.data, job.count);
+        // FIX: Live mode performs local KNN inference and never sends a POST.
+        if (OPERATION_MODE == "live") {
+          updateKnnPrediction(job.data, job.count);
+        } else {
+          postBuffer(job.data, job.count);
+        }
       } else {
         Serial.println("Skipped upload from a previous collection session.");
       }
@@ -472,14 +532,7 @@ void uploaderTask(void* pvParameters) {
   }
 }
 
-void postBuffer(SensorSample* data, int count) {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected, skipping POST.");
-    postFailed = true;
-    collectionEnabled = false;
-    return;
-  }
-
+void updateKnnPrediction(SensorSample* data, int count) {
   uint8_t predictionVotes[SmartGymKnn::LABEL_COUNT] = {};
   for (int i = 0; i < count; i++) {
     ++predictionVotes[predictSensorSample(data[i])];
@@ -491,26 +544,61 @@ void postBuffer(SensorSample* data, int count) {
       prediction = label;
     }
   }
+
   const uint8_t winningVotes = predictionVotes[prediction];
   const float predictionConfidence = count > 0 ? static_cast<float>(winningVotes) / count : 0.0f;
   latestPrediction = prediction;
   latestPredictionConfidence = static_cast<uint8_t>(predictionConfidence * 100.0f);
   predictionAvailable = true;
+  postFailed = false;
   Serial.printf("KNN: %s / %s (%.0f%%)\n",
                 knnExerciseName(prediction), knnPostureName(prediction), predictionConfidence * 100.0f);
+  publishLivePrediction(count);
+}
+
+void publishLivePrediction(int count) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, live result not published.");
+    return;
+  }
+
+  String url = String(LIVE_RESULT_URL) + "?mode=live";
+  // FIX: Publish the exercise predicted by KNN, not the collection label.
+  url += "&exercise=" + String(knnExerciseName(latestPrediction));
+  url += "&posture=" + String(knnPostureName(latestPrediction));
+  url += "&label=" + String(SmartGymKnn::labelName(latestPrediction));
+  url += "&confidence=" + String(latestPredictionConfidence / 100.0f, 3);
+  url += "&timestamp=" + String(count > 0 ? millis() : 0);
+  url += "&samples=" + String(count);
+
+  HTTPClient http;
+  http.begin(url);
+  const int httpCode = http.GET();
+  if (httpCode >= 200 && httpCode < 300) {
+    Serial.println("Live KNN result published.");
+  } else {
+    Serial.printf("Live result publish failed: %s\n", http.errorToString(httpCode).c_str());
+  }
+  http.end();
+}
+
+void postBuffer(SensorSample* data, int count) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi not connected, skipping POST.");
+    postFailed = true;
+    collectionEnabled = false;
+    return;
+  }
+
+  Serial.printf("Data collection: uploaded %d labeled samples\n", count);
 
   // Build JSON payload
   DynamicJsonDocument doc(16384); // adjust size if BUFFER_SIZE grows
   doc["exercise"] = EXERCISE_NAME;   // e.g. "squat", "pushup", "bicep_curl"
   doc["posture"]  = POSTURE_LABEL;   // "good" or "bad"
   doc["user"]     = USER_NAME;
-  JsonObject livePrediction = doc.createNestedObject("prediction");
-  livePrediction["label"] = SmartGymKnn::labelName(prediction);
-  livePrediction["exercise"] = knnExerciseName(prediction);
-  livePrediction["posture"] = knnPostureName(prediction);
-  livePrediction["confidence"] = predictionConfidence;
-  livePrediction["timestamp"] = count > 0 ? data[count - 1].timestamp : 0;
-  livePrediction["samples"] = count;
+  // FIX: Send the selected mode so the dashboard can show it independently of online state.
+  doc["mode"]      = OPERATION_MODE;
   JsonArray samples = doc.createNestedArray("samples");
 
   for (int i = 0; i < count; i++) {
@@ -544,7 +632,8 @@ void postBuffer(SensorSample* data, int count) {
 }
 
 // ---------------- SETUP ----------------
-void setupDataCollection() {
+// FIX: Use the Arduino entry point so the linker can find setup().
+void setup() {
   Serial.begin(115200);
   delay(500);
 
@@ -565,6 +654,7 @@ void setupDataCollection() {
 
   bufferMutex = xSemaphoreCreateMutex();
   uploadQueue = xQueueCreate(2, sizeof(UploadJob)); // small queue: only need 1-2 pending batches
+  // FIX: Boot remains paused; the user must explicitly press Start Collection.
   collectionEnabled = false;
 
   // Pin collector to Core 0, uploader to Core 1
@@ -577,7 +667,8 @@ void setupDataCollection() {
   // Nothing else runs in loop(); everything happens in the two tasks above.
 }
 
-void loopDataCollection() {
+// FIX: Use the Arduino entry point so the runtime continuously services the WebServer.
+void loop() {
   webServer.handleClient();
   vTaskDelay(pdMS_TO_TICKS(10));
 }

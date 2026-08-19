@@ -4,7 +4,7 @@ This folder contains a small FastAPI app that receives labeled MPU6050 telemetry
 
 ## KNN model
 
-The ESP32 sketch uses [knn_model.h](knn_model.h), generated from `data/bicep.csv` and `data/squat.csv`. The model standardizes all 12 MPU6050 features and embeds 64 evenly spaced KNN prototypes per label in flash memory.
+The ESP32 sketch uses [knn_model.h](knn_model.h), generated from `data/bicep.csv`. The squat dataset remains available but is currently excluded from the model. The model standardizes all 12 MPU6050 features and embeds 64 evenly spaced KNN prototypes per label in flash memory.
 
 Regenerate the header after collecting new data:
 
@@ -12,7 +12,7 @@ Regenerate the header after collecting new data:
 python train_knn.py
 ```
 
-The current data produces four labels: `bicep_bad`, `bicep_good`, `bicep_idle_good`, and `squat_good`. The sketch prints one KNN prediction for each uploaded buffer on Serial.
+The current model produces three labels: `bicep_bad`, `bicep_good`, and `bicep_idle_good`. The sketch prints one KNN prediction for each live buffer on Serial.
 
 ## Live monitor
 

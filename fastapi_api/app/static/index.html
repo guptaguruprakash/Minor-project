@@ -21,6 +21,7 @@
     .exercise { margin-top: 12px; font-size: clamp(3rem, 9vw, 7.5rem); line-height: .85; text-transform: capitalize; }
     .posture { display: flex; min-height: 100%; flex-direction: column; justify-content: space-between; }
     .posture-value { margin-top: 40px; color: var(--lime); font-size: clamp(4.5rem, 12vw, 9rem); line-height: .8; text-transform: uppercase; }
+    .posture-value.good { color: var(--lime); }
     .posture-value.bad { color: var(--red); }
     .meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 28px; color: var(--muted); font: 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
     .bar { height: 10px; margin-top: 12px; overflow: hidden; border-radius: 2px; background: #0b100f; }
@@ -33,7 +34,7 @@
   <main>
     <header>
       <div><div class="eyebrow">Smart gym assistant / live mode</div><h1>Form<br>check.</h1></div>
-      <div id="connection" class="connection"><i class="dot"></i><span>Waiting for ESP32</span></div>
+      <div><div id="connection" class="connection"><i class="dot"></i><span>Waiting for ESP32</span></div><div id="mode" class="connection">Mode: unknown</div></div>
     </header>
     <section class="hero">
       <article class="panel"><div class="label">Detected exercise</div><div id="exercise" class="exercise">Waiting</div><div class="meta"><span id="label">No prediction yet</span><span id="samples">0 samples</span></div></article>
@@ -43,15 +44,25 @@
   </main>
   <script>
     const $ = id => document.getElementById(id);
+    function postureText(value) {
+      const normalized = String(value || '').toLowerCase();
+      if (normalized === 'bad' || normalized === 'wrong') return 'BAD POSTURE';
+      if (normalized === 'good') return 'GOOD POSTURE';
+      return normalized ? normalized.toUpperCase() : '--';
+    }
+
     async function refresh() {
       try {
         const response = await fetch('/api/live-status', { cache: 'no-store' });
         const data = await response.json();
         $('connection').classList.toggle('online', data.online);
         $('connection').querySelector('span').textContent = data.online ? 'ESP32 live' : 'ESP32 offline';
+        $('mode').textContent = `Mode: ${(data.mode || 'unknown').replace('_', ' ')}`;
         $('exercise').textContent = data.online ? data.exercise.replace('_', ' ') : 'Waiting';
-        $('posture').textContent = data.online ? data.posture : '--';
-        $('posture').classList.toggle('bad', data.posture === 'bad');
+        const posture = data.online ? postureText(data.posture) : '--';
+        $('posture').textContent = posture;
+        $('posture').classList.toggle('bad', posture === 'BAD POSTURE');
+        $('posture').classList.toggle('good', posture === 'GOOD POSTURE');
         $('label').textContent = data.online ? data.label : 'No prediction yet';
         $('samples').textContent = `${data.samples || 0} samples`;
         const confidence = Math.round((data.confidence || 0) * 100);

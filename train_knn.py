@@ -11,7 +11,7 @@ FEATURE_NAMES = (
     "ax1", "ay1", "az1", "gx1", "gy1", "gz1",
     "ax2", "ay2", "az2", "gx2", "gy2", "gz2",
 )
-DEFAULT_FILES = ("data/bicep.csv", "data/squat.csv")
+DEFAULT_FILES = ("data/bicep.csv",)
 DEFAULT_PROTOTYPES_PER_LABEL = 64
 K_NEIGHBORS = 5
 
