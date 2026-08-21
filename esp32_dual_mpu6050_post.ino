@@ -54,6 +54,7 @@ const char* LIVE_RESULT_URL = "http://192.168.18.105:8000/api/live-prediction";
 
 #define BUFFER_SIZE   50     // samples per buffer before a POST is triggered
 #define SAMPLE_RATE_MS 20    // ~50 Hz sampling
+#define WIFI_CONNECT_TIMEOUT_MS 10000
 
 // ---------------- DATA COLLECTION LABELS ----------------
 // Set these before each recording session (e.g. via Serial input, a physical
@@ -79,7 +80,6 @@ volatile bool predictionAvailable = false;
 volatile uint8_t latestPrediction = 0;
 volatile uint8_t latestPredictionConfidence = 0;
 volatile unsigned long predictionVersion = 0;
-RepCounter repCounter;
 unsigned long lastBadPostureBeepMs = 0;
 unsigned long lastBroadcastPredictionVersion = 0;
 
@@ -92,6 +92,8 @@ struct SensorSample {
 
 #include "knn_model.h"
 #include "RepCounter.h"
+
+RepCounter repCounter;
 
 uint8_t predictSensorFeatures(const float* features);
 const char* knnExerciseName(uint8_t label);
@@ -157,7 +159,7 @@ void setRepCounterExercise(uint8_t label);
 void postBuffer(SensorSample* data, int count);
 bool setupSensors();
 bool setupOLED();
-void connectWiFi();
+bool connectWiFi();
 
 // ---------------- WIFI SETUP ----------------
 void showOLEDMessage(const String& line1, const String& line2 = "", const String& line3 = "", uint8_t textSize = 1) {
@@ -185,7 +187,7 @@ void showOLEDMessage(const String& line1, const String& line2 = "", const String
   oled.display();
 }
 
-void connectWiFi() {
+bool connectWiFi() {
   if (oledReady) {
     showOLEDMessage("Connecting", WIFI_SSID, "Please wait...");
   }
@@ -193,11 +195,21 @@ void connectWiFi() {
   Serial.print("Connecting to WiFi");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
+  const unsigned long startMs = millis();
   int dots = 0;
   while (WiFi.status() != WL_CONNECTED) {
     delay(300);
     Serial.print(".");
     dots++;
+
+    if (millis() - startMs >= WIFI_CONNECT_TIMEOUT_MS) {
+      Serial.println("\nWiFi unavailable; continuing in offline live mode.");
+      if (oledReady) {
+        showOLEDMessage("WiFi Offline", "Live mode", "OLED prediction only");
+        delay(1000);
+      }
+      return false;
+    }
 
     if (oledReady && dots % 4 == 0) {
       showOLEDMessage("Connecting", WIFI_SSID, String("Attempt ") + dots);
@@ -212,6 +224,8 @@ void connectWiFi() {
     delay(1000);
     updateOLED(totalSamplesCollected);
   }
+
+  return true;
 }
 
 String getCollectionState() {
@@ -769,8 +783,8 @@ void setup() {
 
   bufferMutex = xSemaphoreCreateMutex();
   uploadQueue = xQueueCreate(2, sizeof(UploadJob)); // small queue: only need 1-2 pending batches
-  // FIX: Boot remains paused; the user must explicitly press Start Collection.
-  collectionEnabled = false;
+  // Live mode can run locally without WiFi; data collection still waits for the web command.
+  collectionEnabled = OPERATION_MODE == "live";
 
   // Pin collector to Core 0, uploader to Core 1
   xTaskCreatePinnedToCore(
