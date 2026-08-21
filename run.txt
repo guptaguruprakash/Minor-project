@@ -1,1 +1,2 @@
 Start-Process powershell -WorkingDirectory "$PWD\fastapi_api" -ArgumentList "-NoExit","-Command","uvicorn main:app --reload --host 0.0.0.0 --port 8000"; Push-Location frontend; npm run dev -- --host 127.0.0.1; Pop-Location
+python train_knn.py --prototypes-per-label 512

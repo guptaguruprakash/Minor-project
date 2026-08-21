@@ -1,10 +1,22 @@
 \chapter*{ABSTRACT}
 \addcontentsline{toc}{chapter}{ABSTRACT}
 
-This minor project presents a Smart Gym Assistant for monitoring exercise movement and posture using an ESP32, two MPU6050 inertial measurement units, an embedded K-nearest neighbors (KNN) model, and a FastAPI web service. The two sensors provide acceleration and gyroscope measurements from different body locations, producing twelve motion features for each sample. The ESP32 collects the readings at approximately 50 Hz, classifies the movement locally, displays the result on an OLED screen, and transmits sensor batches through Wi-Fi.
+The Smart Gym Assistant is a low-cost wearable exercise-monitoring system designed
+to recognize exercise movements, identify posture quality, count repetitions, and
+provide immediate feedback. The system uses two MPU6050 inertial sensors connected
+to an ESP32 microcontroller. Acceleration and gyroscope readings from both sensors
+form a twelve-feature input vector for a compact K-nearest neighbors classifier.
 
-A Python training script standardizes the sensor features and generates a compact KNN model header for deployment on the ESP32. The current model distinguishes bicep movement states labelled \texttt{bicep\_bad}, \texttt{bicep\_good}, and \texttt{bicep\_idle\_good}. The FastAPI application receives labeled data, stores it in CSV format for later training, accepts live predictions, and provides a browser-based monitoring interface. Double buffering on the ESP32 allows sensor collection to continue while another batch is being uploaded.
+The ESP32 standardizes the sensor features, performs local KNN inference, and uses
+batch voting to produce stable exercise and posture predictions. An OLED display
+and buzzer provide local feedback, while a Wi-Fi connection sends collection data
+and live results to a FastAPI service and browser dashboard. The training pipeline
+cleans labeled CSV data, evaluates prototype counts and neighbor values, and exports
+the selected model to an embedded header file.
 
-The system demonstrates a practical edge-AI architecture in which time-sensitive prediction is performed on the microcontroller while data storage and visualization are handled by a lightweight backend. It can be extended with additional exercises, more users, repetition counting, and a database-backed analytics system.
-
-\textbf{Keywords:} ESP32, MPU6050, wearable sensing, KNN, posture detection, FastAPI, edge machine learning
+The evaluated classes include bicep bad, bicep good, bicep idle, squat bad, squat
+good, and squat idle. The results show strong recognition of idle classes, with F1-
+scores above 94\%, while posture classes remain more challenging because good and
+bad movement patterns can overlap. The system demonstrates that wearable inertial
+sensing and lightweight machine learning can provide practical exercise feedback on
+resource-constrained hardware.

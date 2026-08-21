@@ -1,0 +1,56 @@
+\chapter{LIMITATIONS AND FUTURE ENHANCEMENTS}
+
+\section{Limitations}
+The current Smart Gym Assistant demonstrates exercise and posture recognition using
+wearable inertial sensors, but several limitations remain:
+\begin{itemize}
+\item The implemented classifier supports only bicep curls and squats with the
+      available labeled classes.
+\item Recognition depends on consistent sensor placement and orientation on the
+      user's body.
+\item The training data may not represent every user's movement style, body type,
+      speed, or range of motion.
+\item Bad and good posture classes can overlap, particularly for squats, which
+      reduces recall for incorrect posture detection.
+\item The ESP32 uses a compact prototype set to limit memory and computation, so
+      it may not capture every variation in the motion data.
+\item Live dashboard monitoring depends on Wi-Fi availability and communication
+      with the FastAPI server.
+\end{itemize}
+
+\section{Future Improvements}
+The following improvements can extend the accuracy, usability, and scalability of
+future versions of the system.
+
+\subsection{Support for Additional Exercises}
+Additional exercises such as push-ups, lunges, shoulder presses, and jumping jacks
+can be added by collecting representative labeled data for each exercise and posture
+condition. The training pipeline and embedded label definitions can then be extended
+without changing the basic sensing architecture.
+
+\subsection{Training with More Users and Motion Styles}
+Future datasets should include multiple users, sensor placements, movement speeds,
+and body-motion variations. This would improve generalization and reduce the risk
+that the classifier performs well only for the user who collected the original data.
+
+\subsection{Improved Posture Detection}
+More carefully defined posture boundaries and additional bad-posture examples could
+improve recall for safety-related classes such as \texttt{squat\_bad}. Future work
+could also combine temporal features, movement ranges, and exercise-specific rules
+with the KNN prediction.
+
+\subsection{Optimized Embedded Model}
+The model can be regenerated using the best validated prototype count and value of
+$k$, provided the resulting memory and processing requirements remain suitable for
+the ESP32. Quantization, dimensionality reduction, or a compact alternative model
+could further reduce inference cost.
+
+\subsection{Offline Data Buffering and Reliable Communication}
+The ESP32 could temporarily buffer records when Wi-Fi is unavailable and upload
+those records after reconnection. Retry handling, request status reporting, and
+server-side validation could make collection and live monitoring more reliable.
+
+\subsection{User Interface Enhancements}
+The dashboard could provide session history, exercise summaries, repetition trends,
+class-wise confidence, and calibration guidance. The OLED interface could also show
+clearer status messages for sensor placement, Wi-Fi state, and posture feedback.

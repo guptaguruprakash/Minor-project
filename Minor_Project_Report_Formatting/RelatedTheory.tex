@@ -1,19 +1,254 @@
 \chapter{RELATED THEORY}
-\section{Inertial Measurement Unit}
-An inertial measurement unit measures motion using accelerometers and gyroscopes. An accelerometer measures specific force along the three axes, while a gyroscope measures angular velocity. The MPU6050 combines both sensing functions in one device and communicates with the ESP32 through the I2C bus \cite{invensense_mpu6050}. Two devices can share the same bus when they use different I2C addresses, in this project \texttt{0x68} and \texttt{0x69}.
 
-\section{Feature Representation}
-For every sample, the system records six values from each sensor:
-\[
-\mathbf{x} = [a_{x1},a_{y1},a_{z1},g_{x1},g_{y1},g_{z1},a_{x2},a_{y2},a_{z2},g_{x2},g_{y2},g_{z2}].
-\]
-The twelve values form the input feature vector. Since acceleration and angular velocity have different numerical ranges, the training script standardizes each feature using its mean and scale before calculating distances.
+\section{Artificial Intelligence and Machine Learning}
+Artificial intelligence (AI) refers to systems that can perceive information,
+learn from it, and use that learning to make decisions. Machine learning (ML) is a
+part of AI in which the system learns a relationship from examples instead of being
+controlled entirely by hand-written rules
+\cite{russell2021aima,geron2022hands,mckinney2022python,lecun2015deep}.
 
-\section{K-Nearest Neighbors}
-KNN classifies an unknown sample by finding the $k$ training samples with the smallest distance. The class receiving the majority of votes is returned as the prediction \cite{murphy2022}. This project uses $k=5$ and Euclidean distance over standardized features. The trained prototypes, feature means, feature scales, and labels are generated as a C++ header and stored in ESP32 program memory.
+In this project, ML is used to distinguish bicep curls and squats and to assess
+their posture from motion-sensor measurements. Each recorded sample is paired with
+a label such as \texttt{bicep\_good}, \texttt{bicep\_bad},
+\texttt{squat\_good}, or \texttt{squat\_bad}. During live operation, a new sensor
+sample is compared with labeled training examples and the closest movement pattern
+is selected. The same label structure can later be extended to exercises such as
+push-ups without changing the basic KNN pipeline.
 
-\section{Edge Computing and REST Communication}
-Edge computing performs processing near the data source. In this project, the ESP32 performs prediction locally so that feedback does not depend on a server response \cite{espressif_esp32}. The FastAPI application provides REST endpoints for receiving sensor batches and live predictions \cite{fastapi}. The browser dashboard requests the latest status and marks the ESP32 offline when no recent update has been received.
+\section{Human Activity Recognition}
+Human activity recognition (HAR) means identifying a person's activity from measured
+signals. Wearable inertial sensors are useful for HAR because they capture
+acceleration and angular motion without requiring a camera or a fixed environment
+\cite{wang2019wearable,kwapisz2011activity,lara2013survey,bulling2014tutorial,ordonez2016deep}.
+For an exercise assistant, HAR can be extended from identifying an exercise to
+identifying the quality of its execution. In the current implementation, the
+exercise set contains bicep curls and squats; the exercise name and posture condition
+are represented together in the class label so additional exercises can be added
+later.
+
+\section{Inertial Motion Sensing}
+An inertial measurement unit (IMU) provides measurements related to linear
+acceleration and angular velocity. The project uses two MPU6050 devices so that
+motion can be observed from two sensor locations. For every sampling instant, the
+ESP32 records three acceleration values and three gyroscope values from each sensor.
+The resulting feature vector is
+\begin{equation}
+\mathbf{x} = [a_{x1},a_{y1},a_{z1},g_{x1},g_{y1},g_{z1},
+a_{x2},a_{y2},a_{z2},g_{x2},g_{y2},g_{z2}].
+\end{equation}
+
+The two-sensor arrangement provides more information than a single acceleration
+axis or a single sensor. It can help distinguish similar exercise movements when the
+relative orientation or motion of the two body locations is important. Sensor data
+must nevertheless be collected with consistent placement, orientation, sampling
+interval, and exercise labeling to obtain reliable predictions.
+
+\section{Feature Scaling and Standardization}
+Acceleration and gyroscope measurements have different numerical ranges. If raw
+values are compared directly, features with larger magnitudes can dominate the
+distance calculation. The training process therefore standardizes each feature using
+its training-set mean and standard deviation:
+\begin{equation}
+z_i = \frac{x_i-\mu_i}{\sigma_i},
+\end{equation}
+where $\mu_i$ is the mean and $\sigma_i$ is the standard deviation of feature $i$.
+The same values calculated during training are embedded in \texttt{knn\_model.h} and
+used by the ESP32 during inference. This keeps training and live prediction in the
+same feature space.
+
+\section{K-Nearest Neighbors Classification}
+K-nearest neighbors (KNN) is a supervised, instance-based classification method.
+For an unseen feature vector, KNN calculates its distance from stored labeled
+examples, selects the $k$ closest examples, and assigns the majority class among
+those neighbors \cite{geron2022hands}.
+
+Using standardized features, the squared Euclidean distance between a live vector
+and a stored prototype is
+\begin{equation}
+d(\mathbf{x},\mathbf{y}) = \sum_{i=1}^{12}(x_i-y_i)^2.
+\end{equation}
+The embedded model uses a fixed value of $k=5$. To fit the model within the ESP32's
+memory and computation limits, representative prototypes are selected for each
+label. The prototypes, labels, feature means, and feature scales are stored in
+program memory. This avoids requiring a full Python or scikit-learn runtime on the
+microcontroller. The use of a microcontroller for sensing and control is consistent
+with the embedded prototyping principles described by Banzi and Shiloh
+\cite{banzi2022arduino}.
+
+\section{Live Batch Prediction}
+An individual sensor reading may be noisy or may not contain enough information to
+identify the movement confidently. To make the result more stable, the firmware
+collects 50 samples at approximately 50 samples per second. KNN is applied to each
+sample, and the label receiving the most votes becomes the batch prediction. The
+displayed confidence is calculated as
+\begin{equation}
+\text{confidence} = \frac{\text{votes for winning label}}{\text{number of samples in batch}}.
+\end{equation}
+This temporal voting reduces the effect of a single unstable reading and provides a
+practical live update approximately once per second.
+
+\section{Edge Computing with ESP32}
+Edge computing performs data processing close to the sensing device instead of
+sending every raw measurement to a remote service. In this project, the ESP32 reads
+the sensors, performs feature preparation and KNN inference, and generates immediate
+feedback locally. The sensor buffers are uploaded to the FastAPI server for storage
+and web monitoring. This division reduces the dependency of the classification step
+on network latency while retaining a central record of collected data.
+
+\section{ESP32 and Real-Time Task Execution}
+The ESP32 is a microcontroller platform suitable for connected sensing applications
+because it combines processing, wireless networking, general-purpose input/output,
+and real-time task support in a compact device \cite{espressif2024esp32,banzi2022arduino}.
+The firmware separates continuous sensor collection from network processing. A
+collector task reads both MPU6050 devices at a fixed sampling interval, while an
+uploader task processes completed buffers. This separation prevents a slow HTTP
+request from directly blocking the sensor sampling loop.
+
+The task arrangement follows a producer-consumer model. The collector is the
+producer of sensor samples and the uploader is the consumer of completed batches.
+Shared buffer indexes and queue operations are protected by a mutex and a queue so
+that the two tasks can operate safely on different ESP32 cores. The design is
+particularly useful for live monitoring, where sampling regularity is more important
+than waiting for each network operation to finish.
+
+\section{I2C Communication and Multiple Sensors}
+Inter-Integrated Circuit (I2C) is a synchronous two-wire communication protocol that
+uses a shared serial data line (SDA) and serial clock line (SCL). Devices on the same
+bus are distinguished by their addresses. The MPU6050 provides acceleration and
+gyroscope measurements through I2C, and its address can be selected using the AD0
+pin \cite{invensense2013mpu6050}.
+
+This project assigns address \texttt{0x68} to the first MPU6050 and \texttt{0x69} to
+the second one. Both sensors can therefore be read through the same ESP32 I2C bus
+without requiring separate data buses. Correct common grounding, power supply,
+pull-up behavior, and AD0 configuration are necessary for reliable communication.
+The OLED display also uses I2C, but has a different address, allowing it to share the
+bus with the motion sensors.
+
+\section{Double Buffering and Data Integrity}
+The firmware uses two fixed-size sensor buffers in a ping-pong arrangement. While
+the collector fills one buffer, the uploader can process the other buffer. When a
+buffer reaches 50 samples, it is placed in an upload queue and the collector changes
+to the alternate buffer. This technique is called double buffering and is commonly
+used when a producer must continue generating data while a consumer performs a
+slower operation.
+
+Each uploaded sample contains a timestamp and the twelve sensor features. A
+generation number identifies the collection session, so a buffer belonging to an
+old session can be discarded after reset. If the upload queue becomes full, the
+firmware drops an older pending batch instead of stopping the collector. This keeps
+the live sampling path responsive, although it means that network congestion can
+cause some batches not to be stored.
+
+\section{Collection Mode and Live Mode}
+The system has two operation modes. In data-collection mode, labeled sensor batches
+are sent to the FastAPI server and appended to the training CSV file. The selected
+exercise and posture fields provide the ground-truth label for those recordings. In
+live mode, the ESP32 performs KNN inference locally and sends only the latest result
+to the live-result endpoint; raw live samples are not appended to the training file.
+
+Separating these modes prevents live predictions from accidentally becoming training
+labels. It also allows the same hardware to be used first for supervised data
+collection and later for independent evaluation. The live mode reports the predicted
+exercise, posture, confidence, timestamp, and sample count.
+
+\section{HTTP API and WebSocket Monitoring}
+The ESP32 communicates with the FastAPI service using HTTP. Data collection uses a
+JSON POST request containing session information and an array of sensor samples.
+Live mode uses an HTTP request for the prediction result. FastAPI validates the
+request fields, stores collection batches in CSV format, and maintains the latest
+live status in memory.
+
+For browser monitoring, the service exposes both a live-status endpoint and a
+WebSocket channel. HTTP polling is simple and suitable for periodic status checks,
+whereas a WebSocket can push a new prediction to connected clients as soon as the
+ESP32 publishes it. The dashboard can therefore show the exercise, posture,
+confidence, repetition count, mode, and online state without reading the ESP32's
+serial output.
+
+\section{Real-Time Feedback and System Interface}
+The predicted exercise, posture, and confidence are shown on the OLED display. The
+display can report \texttt{good}, \texttt{bad}, or \texttt{idle}; it also reports
+paused and upload-failure states. A buzzer can provide an additional local signal,
+such as a short tone for acceptable posture and a longer tone for an incorrect
+posture. The FastAPI service receives the prediction together with the sensor batch,
+and the browser dashboard polls the latest status to show exercise name, posture,
+confidence, and connection state.
+
+\section{Repetition Counting Algorithm}
+Exercise classification and repetition counting are related but different tasks. The
+classifier identifies the exercise and posture class, while the repetition counter
+identifies completed movement cycles. Repetition counting from wearable sensors can
+be treated as a periodic-signal analysis problem because repeated movements produce
+recurrent patterns in acceleration and angular velocity
+\cite{bao2004activity,ravi2005activity,oppenheim2010discrete}.
+
+First, the acceleration and gyroscope components can be combined into motion
+magnitudes to reduce sensitivity to sensor-axis orientation. For sensor $j$, the
+acceleration magnitude is
+\begin{equation}
+a_j(t)=\sqrt{a_{xj}(t)^2+a_{yj}(t)^2+a_{zj}(t)^2},
+\end{equation}
+and the gyroscope magnitude is
+\begin{equation}
+g_j(t)=\sqrt{g_{xj}(t)^2+g_{yj}(t)^2+g_{zj}(t)^2}.
+\end{equation}
+The magnitudes from both sensors can be averaged or combined into a motion signal
+$m(t)$. A short moving-average filter reduces high-frequency sensor noise:
+\begin{equation}
+\widetilde{m}(t)=\frac{1}{w}\sum_{i=0}^{w-1}m(t-i),
+\end{equation}
+where $w$ is a small window selected according to the sampling rate.
+
+The counter uses an adaptive baseline and two thresholds. A movement is considered
+active when the filtered signal moves above the activation threshold, and a
+repetition is counted only after the signal returns below the release threshold.
+Using separate thresholds, known as hysteresis, prevents small fluctuations near one
+threshold from producing multiple counts. A minimum time interval between counts
+also prevents a single movement from being counted more than once.
+
+The live repetition-counting procedure is:
+\begin{enumerate}
+	\item Read the two IMUs and calculate the combined motion signal.
+	\item Apply a moving-average filter and update the recent baseline.
+	\item Detect a rising crossing of the activation threshold.
+	\item Enter the \texttt{MOVING} state and wait for a falling crossing of the release threshold.
+	\item If the minimum repetition interval has elapsed, increment the repetition count.
+	\item Return to the \texttt{READY} state and wait for the next movement cycle.
+\end{enumerate}
+
+This state-machine design is suitable for an ESP32 because it requires only a small
+rolling buffer and a few scalar variables. The exercise class predicted by KNN can
+select exercise-specific thresholds, since a squat and a bicep curl may have
+different signal amplitudes and cycle durations. The counter should be reset when a
+new exercise is selected, when the user pauses, or when the system detects a long
+idle interval. A repetition is counted only after a complete active-and-release
+cycle, which avoids counting partial movements as valid repetitions.
+
+For a more reliable implementation, the threshold and minimum interval should be
+estimated from labeled training recordings rather than fixed only from one user's
+motion. Validation should compare the automatic count with manually counted
+repetitions using count error and mean absolute error in addition to classification
+accuracy.
+
+\section{Model Evaluation}
+Accuracy alone can be misleading when classes have different numbers of samples.
+The model is therefore evaluated using a stratified validation split, in which each
+label is represented in both the training and validation sets. A confusion matrix
+shows the relationship between actual and predicted labels. Precision, recall, and
+F1-score are also useful for posture detection because they reveal whether a class
+is being missed or incorrectly predicted:
+\begin{equation}
+\text{precision} = \frac{TP}{TP+FP}, \qquad
+\text{recall} = \frac{TP}{TP+FN},
+\end{equation}
+\begin{equation}
+F1 = 2\frac{\text{precision}\cdot\text{recall}}
+{\text{precision}+\text{recall}}.
+\end{equation}
+The training notebook compares different values of $k$ and different numbers of
+embedded prototypes per label using validation accuracy, a parameter-performance
+graph, and a normalized confusion matrix.
 
 
 

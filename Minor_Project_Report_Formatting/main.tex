@@ -13,6 +13,7 @@
 \usepackage{caption}
 \usepackage{setspace}
 \usepackage{tocloft}
+\usepackage[colorlinks=true,citecolor=blue,linkcolor=black,urlcolor=blue,hypertexnames=false]{hyperref}
 
 %----------------------------------------------------------------------
 %	FONTS,INDENTATION, MARGINS, LINE SPACING
@@ -54,6 +55,8 @@
 \renewcommand{\cftbeforetoctitleskip}{-18pt} % Space before the TOC title
 \renewcommand{\cftaftertoctitleskip}{12pt} % Space after the TOC title
 \renewcommand{\cftbeforechapskip}{9pt} % Space before each chapter entry
+\renewcommand{\cftchapfont}{\bfseries}
+\renewcommand{\cftchappagefont}{\bfseries}
 \renewcommand{\cftbeforesecskip}{9pt} % Space before each section entry
 \renewcommand{\cftbeforesubsecskip}{9pt} % Space before each section entry
 \renewcommand{\contentsname}{\fontsize{14}{16}\bfseries TABLE OF CONTENTS}
@@ -83,6 +86,7 @@
 \begin{document}
 
 \include{CoverPage}
+\include{LetterOfApproval}
 %\include{TitlePage}
 %\include{Copyright}
 %\include{Declaration}
@@ -100,10 +104,13 @@
 \include{RelatedTheory}
 \include{LiteratureReview}
 \include{Methodology}
-\include{ExpectedResults}
+\include{ExperimentalSetup}
+\include{SystemDesign}
+\include{ResultsDiscussion}
 \include{Conclusion}
+\include{LimitationsFutureEnhancements}
 \include{References}
-\include{Appendix}
+
 
 \end{document}
 

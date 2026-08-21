@@ -1,9 +1,154 @@
 \chapter{LITERATURE REVIEW}
 
-Wearable exercise-monitoring systems commonly use inertial sensors because they are inexpensive, portable, and less sensitive to lighting and camera occlusion than vision-based systems. Accelerometers are useful for detecting changes in linear motion, while gyroscopes provide information about rotation. Combining both measurements gives a richer description of exercise movement.
+\section{Wearable Sensor-Based Activity Recognition}
+Researchers have increasingly explored wearable sensors as an alternative to
+camera-based activity monitoring. Accelerometers and gyroscopes are attractive for
+this purpose because they are inexpensive, portable, and able to record movement
+without restricting the user to a particular camera view. Surveys by Wang
+\textit{et al.} and Lara and Labrador discuss how these sensors are used for activity
+recognition, while also pointing out the effects of sensor placement, signal quality,
+and differences between users
+\cite{wang2019wearable,lara2013survey}.
 
-Machine-learning methods have also been applied to activity and posture recognition. KNN is an attractive method for small embedded prototypes because training is straightforward and the classification rule is easy to interpret. Its main limitations are the need to retain representative samples and the effect of feature scaling on distance calculations. These limitations are addressed here by selecting a bounded number of prototypes per label and standardizing every feature.
+Kwapisz \textit{et al.} demonstrated that acceleration data can be used to identify
+activities using a mobile device, showing the usefulness of time-domain inertial
+signals for activity classification \cite{kwapisz2011activity}. Similarly, Bao and
+Intille investigated user-annotated acceleration data and showed that sensor
+location and the selected activity features influence recognition performance
+\cite{bao2004activity}. These findings support the use of two MPU6050 sensors in the
+present project, since measurements from two locations can provide more information
+about exercise movement and posture than a single sensor.
 
-Cloud and web-connected fitness systems simplify storage and visualization, but network dependence can introduce delay and privacy concerns. The architecture in this project separates responsibilities: the ESP32 performs immediate classification, and the FastAPI service stores data and exposes monitoring functions. This approach combines the responsiveness of edge processing with the convenience of a web interface.
+\section{Inertial Sensors for Exercise Monitoring}
+Bulling \textit{et al.} presented a tutorial on human activity recognition using
+body-worn inertial sensors and discussed the importance of sensor orientation,
+segmentation, and feature representation \cite{bulling2014tutorial}. These issues
+are directly relevant to gym-exercise monitoring. A sensor attached at a consistent
+body location can record acceleration and angular velocity patterns associated with
+the different phases of a squat or bicep curl.
 
-The reviewed approaches motivate a dual-MPU6050, edge-KNN design for the prototype. Future evaluation should compare KNN with other classifiers using a separate test set and should measure accuracy across different users and sensor placements.
+In this project, two MPU6050 devices are used to capture three-axis acceleration and
+three-axis gyroscope measurements. Each reading therefore produces a 12-value
+feature vector. This arrangement avoids the privacy and viewpoint limitations of
+video-based systems while keeping the hardware simple enough for a low-cost gym
+assistant prototype.
+
+\section{Evolution of AI in Fitness Monitoring}
+Early fitness monitoring systems mainly depended on manual workout records,
+pedometers, and simple threshold rules. The development of wearable sensors and
+embedded computing enabled continuous collection of physiological and motion data.
+Modern AI systems use these measurements to recognize exercises, analyze posture,
+count repetitions, and provide feedback during a workout. The AI principles of
+perception, learning, and decision making described by Russell and Norvig provide a
+general foundation for these intelligent fitness applications
+\cite{russell2021aima}.
+
+Recent machine-learning and deep-learning methods can learn increasingly complex
+movement patterns from labeled sensor datasets. However, a fitness assistant for a
+resource-constrained ESP32 must also consider memory, processing time, power, and
+network availability. This project therefore uses a compact KNN model for local
+inference while retaining a design that can be extended to more advanced models in
+future work.
+
+\section{Machine Learning Methods for Activity Classification}
+Activity-recognition systems have used decision trees, support-vector machines,
+nearest-neighbor methods, neural networks, and deep-learning models. Geron describes
+the importance of preparing features, training a classifier, and evaluating it on
+data that was not used during training
+\cite{geron2022hands}. McKinney highlights the importance of reliable data loading,
+cleaning, analysis, and visualization when building a data-driven system
+\cite{mckinney2022python}.
+
+K-nearest neighbors was selected for this project because it is straightforward to
+train, works directly with labeled feature vectors, and does not require a large
+runtime on the ESP32. The training process standardizes the sensor features and
+stores representative examples from each class in program memory. During live use,
+the closest examples determine the exercise and posture prediction. This gives the
+prototype a model that is easy to inspect and practical to run on the device.
+
+\section{Deep Learning-Based Recognition}
+Deep learning has achieved strong results in many perception and activity-recognition
+tasks. LeCun, Bengio, and Hinton describe how multilayer neural networks can learn
+representations directly from data \cite{lecun2015deep}. Ordonez and Roggen used
+convolutional and recurrent neural networks for multimodal wearable activity
+recognition, demonstrating the potential of temporal neural models for sensor
+sequences \cite{ordonez2016deep}.
+
+Although deep learning is a possible future direction, it is not the primary method
+used in the current prototype. Neural-network training generally requires more
+data, computation, and memory than the selected compact KNN implementation. KNN
+also makes it easier to inspect the relationship between a live sensor vector and
+the stored training examples. A future version could compare the embedded KNN model
+with a quantized neural network after collecting a larger and more diverse dataset.
+
+\section{Posture Detection and Real-Time Feedback}
+Posture correction is an important part of an intelligent fitness assistant because
+incorrect form can reduce exercise effectiveness and increase injury risk. A posture
+classifier compares live acceleration and angular-velocity patterns with labeled
+good- and bad-posture examples. The output can then be converted into immediate
+visual or audio feedback.
+
+In the proposed system, the KNN label contains both the exercise and posture state.
+The ESP32 displays the predicted exercise, \texttt{good}, \texttt{bad}, or
+\texttt{idle} state on an OLED and can activate a buzzer for incorrect posture. The
+web dashboard provides the same prediction and confidence for remote monitoring.
+This combines recognition and feedback in the same low-cost embedded workflow.
+
+\section{Data Processing and Feature Engineering}
+Raw accelerometer and gyroscope readings may contain noise, drift, and fluctuations
+caused by sensor placement or user movement. Data preparation is therefore required
+before model training. Standardization, consistent sampling, removal of malformed
+rows, and validation of class labels improve the reliability of the training data
+\cite{mckinney2022python}.
+
+Common motion features include mean acceleration, standard deviation, signal
+magnitude, angular velocity, and orientation-related values. The current prototype
+uses the twelve direct readings from the two MPU6050 sensors and standardizes them
+before calculating KNN distances. This keeps the embedded implementation compact,
+while the feature pipeline can later be expanded if additional exercises or users
+require greater separation between classes.
+
+\section{Repetition Counting and Movement Segmentation}
+Activity recognition identifies what a user is doing, whereas repetition counting
+determines how many complete movement cycles have been performed. Ravi \textit{et al.}
+and Bao and Intille show that repeated activities can be recognized from recurring
+patterns in accelerometer signals \cite{ravi2005activity,bao2004activity}. Signal
+processing methods such as smoothing, thresholding, peak detection, and hysteresis
+can therefore be used to segment exercise cycles before incrementing a repetition
+counter \cite{oppenheim2010discrete}.
+
+In this project, repetition counting is designed as a separate processing stage from
+KNN classification. The classifier identifies the exercise and posture, while the
+counter uses a filtered motion magnitude and a state transition from an active phase
+to a release phase. This separation allows the counting thresholds to be adjusted
+for each exercise and prevents a noisy single sample from being interpreted as a
+complete repetition.
+
+\section{Embedded and Connected Fitness Systems}
+Arduino-based embedded prototyping provides a practical platform for connecting
+sensors, displays, actuators, and network services \cite{banzi2022arduino}. The ESP32
+extends this approach with wireless communication and real-time task support
+\cite{espressif2024esp32}. FastAPI provides a lightweight service layer for receiving
+structured sensor batches and serving live status to a browser
+\cite{fastapi2024docs}.
+
+The proposed system combines these ideas into one workflow. The ESP32 collects data
+from two IMUs, performs local KNN inference in live mode, displays the prediction on
+an OLED, and uses a buzzer for posture feedback. In collection mode, labeled samples
+are transmitted to the FastAPI service for storage and later model training. The
+browser dashboard presents the latest exercise, posture, confidence, and repetition
+information to the user.
+
+\section{Research Gap and Proposed Contribution}
+Existing activity-recognition research demonstrates the value of wearable inertial
+sensors and machine learning, but many solutions focus on general activities,
+offline analysis, or computationally larger models. Other systems may identify an
+exercise without explicitly providing posture feedback, repetition counting, and a
+live user interface in one low-cost prototype.
+
+This project addresses that gap by integrating two MPU6050 sensors, compact KNN
+classification, batch voting for stable live predictions, repetition-counting
+logic, OLED and buzzer feedback, and a FastAPI web monitor. The current evaluation
+focuses on two exercises, bicep curls and squats. The design remains extensible:
+additional exercises such as push-ups can be added by collecting labeled samples,
+including their classes during training, and regenerating the embedded model.

@@ -11,7 +11,7 @@ FEATURE_NAMES = (
     "ax1", "ay1", "az1", "gx1", "gy1", "gz1",
     "ax2", "ay2", "az2", "gx2", "gy2", "gz2",
 )
-DEFAULT_FILES = ("data/bicep.csv",)
+DEFAULT_FILES = ("data/train.csv",)
 DEFAULT_PROTOTYPES_PER_LABEL = 64
 K_NEIGHBORS = 5
 
@@ -23,6 +23,8 @@ def load_rows(paths):
             reader = csv.DictReader(csv_file)
             for row in reader:
                 label = row.get("label", "").strip()
+                if label == "label":
+                    continue
                 if label:
                     rows.append((label, [float(row[name]) for name in FEATURE_NAMES]))
     if not rows:
@@ -176,7 +178,7 @@ def main():
     parser.add_argument("--output", type=Path, default=Path("knn_model.h"))
     parser.add_argument("--prototypes-per-label", type=int, default=DEFAULT_PROTOTYPES_PER_LABEL)
     parser.add_argument("files", nargs="*", type=Path, default=[Path(path) for path in DEFAULT_FILES])
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     rows = load_rows(args.files)
     training = choose_prototypes(rows, args.prototypes_per_label)

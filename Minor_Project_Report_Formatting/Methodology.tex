@@ -1,21 +1,259 @@
 \chapter{METHODOLOGY}
+
 \section{Overview}
-The system is implemented in four stages: sensor acquisition, model training, embedded inference, and server-side monitoring. The ESP32 reads both sensors at a fixed interval and places samples into alternating memory buffers. When one buffer is full, it is handed to the upload task while the collector continues using the other buffer.
+The Smart Gym Assistant is developed as an embedded sensing and machine-learning
+system. Two MPU6050 sensors collect body-motion data, and an ESP32 processes the
+readings to identify supported exercises and posture states. The system also counts
+completed repetitions and provides feedback through an OLED display, a buzzer, and
+a web dashboard. The current implementation focuses on bicep curls and squats.
 
-\section{Hardware Design}
-The two MPU6050 modules are connected to the ESP32 through I2C. Their AD0 pins are configured so that the first sensor uses address \texttt{0x68} and the second uses address \texttt{0x69}. An SH1106 OLED is connected to display collection state, sample count, prediction, posture, and confidence. The ESP32 uses Wi-Fi to communicate with the computer running FastAPI.
+The methodology covers the feasibility of the system, its requirements, data flow,
+KNN model-training pipeline, live operation, application deployment, and evaluation.
+The design is modular so additional exercises can be added later by collecting new
+labeled data and regenerating the embedded model.
 
-\section{Data Collection and Preparation}
-Each sample contains a timestamp and twelve sensor values. During collection, the sample is tagged with the exercise, posture, and user name. The FastAPI endpoint validates the JSON structure and appends valid batches to \texttt{sensor\_data\_labeled.csv}. The Python training script reads the labeled CSV, groups rows by label, selects a maximum of 64 evenly distributed prototypes per label, and calculates the mean and standard deviation for each feature.
+Figure~\ref{fig:system-design} presents the overall system design of the Smart Gym
+Assistant, including the sensing, processing, communication, storage, and output
+components.
 
-\section{Model Training and Deployment}
-The standardized prototypes and labels are written to \texttt{knn\_model.h}. During inference, the ESP32 standardizes the incoming twelve-feature vector using the stored means and scales. It calculates the squared Euclidean distance to each embedded prototype, keeps the five nearest prototypes, and returns the majority label. The current deployed labels are \texttt{bicep\_bad}, \texttt{bicep\_good}, and \texttt{bicep\_idle\_good}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{Graphics/design.png.png}
+\caption{System design diagram of the Smart Gym Assistant.}
+\label{fig:system-design}
+\end{figure}
 
-\section{FastAPI Integration}
-The server exposes an endpoint for batched sensor data and another endpoint for live prediction updates. Collection-mode batches are stored in CSV format, while live prediction messages update an in-memory status object. The dashboard reads this status and reports the exercise, posture, confidence, number of samples, and online state.
+\section{Feasibility Analysis}
+\subsection{Technical Feasibility}
+The system is technically feasible because the ESP32 can communicate with two
+MPU6050 sensors over I2C, process a compact KNN model, connect to Wi-Fi, and drive
+the OLED and buzzer. The model uses twelve numeric sensor features and a limited set
+of representative prototypes, which keeps live inference practical on the
+microcontroller.
 
-\section{Testing Procedure}
-Testing consists of checking sensor initialization, confirming that both I2C addresses respond, verifying KNN label output for recorded samples, checking JSON transmission from the ESP32, and confirming that the server stores valid collection batches. Model evaluation should use a separate test portion of the data; the generator's prototype self-check alone is not a sufficient estimate of generalization accuracy.
+\subsection{Economic Feasibility}
+The prototype uses low-cost and widely available components: an ESP32 board, two
+MPU6050 modules, an OLED display, and a buzzer. The software tools are open-source
+or freely available for educational use. Therefore, the system can be developed and
+maintained at a lower cost than camera-based commercial fitness systems.
 
+\subsection{Operational Feasibility}
+The system is simple to operate. The user places the sensors consistently, connects
+the ESP32 to Wi-Fi, and selects either data-collection mode or live mode. Results are
+shown locally on the OLED and remotely through the browser dashboard. The feedback
+does not require a dedicated camera or continuous supervision by a trainer.
 
+\section{Requirement Analysis}
+\subsection{Functional Requirements}
+Table~\ref{tab:functional-requirements} lists the main functions required from the
+system.
+\begin{table}[H]
+	\centering
+	\caption{Functional requirements}
+	\label{tab:functional-requirements}
+	\begin{tabular}{|c|p{0.72\textwidth}|}
+		\hline
+		\textbf{ID} & \textbf{Requirement} \\ \hline
+		FR1 & Collect acceleration and gyroscope readings from two MPU6050 sensors. \\ \hline
+		FR2 & Identify the supported exercise and posture using the trained KNN model. \\ \hline
+		FR3 & Count completed repetitions from the motion signal. \\ \hline
+		FR4 & Display exercise, posture, confidence, and system status on the OLED. \\ \hline
+		FR5 & Provide buzzer feedback when bad posture is detected. \\ \hline
+		FR6 & Collect and upload labeled sensor batches in data-collection mode. \\ \hline
+		FR7 & Publish live predictions to the FastAPI service and web dashboard. \\ \hline
+		FR8 & Store labeled training samples in CSV format. \\ \hline
+	\end{tabular}
+\end{table}
 
+\subsection{Non-Functional Requirements}
+Table~\ref{tab:nonfunctional-requirements} lists the quality and operational
+requirements of the system.
+\begin{table}[H]
+	\centering
+	\caption{Non-functional requirements}
+	\label{tab:nonfunctional-requirements}
+	\begin{tabular}{|c|p{0.72\textwidth}|}
+		\hline
+		\textbf{ID} & \textbf{Requirement} \\ \hline
+		NFR1 & Sample motion data at approximately 50 samples per second. \\ \hline
+		NFR2 & Provide a live result after each 50-sample batch. \\ \hline
+		NFR3 & Continue sampling while a network request is being processed. \\ \hline
+		NFR4 & Use portable, low-cost, and easily replaceable hardware. \\ \hline
+		NFR5 & Provide clear local and web-based feedback. \\ \hline
+		NFR6 & Allow future exercise classes to be added without redesigning the complete system. \\ \hline
+	\end{tabular}
+\end{table}
+
+\section{System Block Diagram}
+Figure~\ref{fig:system-block} presents the conceptual processing flow. Motion data
+is collected by the sensors and passed to the ESP32 for preprocessing. The KNN
+model identifies the exercise and posture, while the repetition counter and
+feedback system provide the final user response.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.58\textwidth]{Graphics/block diagram.png}
+	\caption{Conceptual block diagram of the Smart Gym Assistant.}
+	\label{fig:system-block}
+\end{figure}
+
+The original conceptual figure uses the general terms ``motion sensor'' and
+``microcontroller.'' In the implemented prototype, these correspond to two MPU6050
+modules and the ESP32. The implemented output devices are the SH1106 OLED and the
+buzzer; the web dashboard is reached through the ESP32 Wi-Fi connection and FastAPI.
+
+\subsection{Data Collection}
+The two MPU6050 sensors are connected to the ESP32 through the I2C bus. The first
+sensor uses address \texttt{0x68} and the second uses address \texttt{0x69}. The
+AD0 pins are configured differently so both sensors can share the same SDA and SCL
+lines. Each reading contains three acceleration and three gyroscope values from each
+sensor, forming the twelve-feature vector
+\begin{equation}
+\mathbf{x}(t) = [a_{x1},a_{y1},a_{z1},g_{x1},g_{y1},g_{z1},
+a_{x2},a_{y2},a_{z2},g_{x2},g_{y2},g_{z2}].
+\end{equation}
+
+The collector task samples the sensors every 20 milliseconds. Each sample is
+timestamped and written to the active buffer. After 50 samples, the completed
+buffer is passed to the processing or upload task.
+
+\subsection{Detection Engine}
+The detection engine standardizes the twelve features and compares the live vector
+with the stored KNN prototypes. The squared Euclidean distance is
+\begin{equation}
+d(\mathbf{x},\mathbf{y}) = \sum_{i=1}^{12}(x_i-y_i)^2.
+\end{equation}
+The five nearest prototypes vote for the sample label. The majority label across a
+50-sample batch becomes the final live prediction. The label combines exercise and
+posture, such as \texttt{bicep\_good}, \texttt{bicep\_bad}, \texttt{squat\_good}, or
+\texttt{squat\_bad}.
+
+\subsection{Response System}
+The response system displays the detected exercise, posture, and confidence on the
+OLED. It can activate the buzzer for bad posture. In live mode, the result is also
+sent to FastAPI, which makes the latest exercise, posture, confidence, and online
+state available to the web dashboard.
+
+\section{Data Flow for Data-Collection Mode}
+Data-collection mode is used to create labeled training data. The user selects the
+exercise and posture through the ESP32 web interface or the serial command. The
+collector then reads both sensors, creates timestamped samples, and stores them in
+alternating buffers.
+
+When a buffer reaches 50 samples, the uploader serializes the batch as JSON and
+sends it using an HTTP POST request to the FastAPI endpoint. The payload contains
+the user, exercise, posture, and sensor samples. FastAPI validates the payload and
+appends each sample to the labeled CSV file. The resulting data is later used by the
+Python training script.
+
+Figure~\ref{fig:data-collection-flow} illustrates the data-collection process.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{Graphics/data_collection_flow.png}
+\caption{Data-collection mode flow.}
+\label{fig:data-collection-flow}
+\end{figure}
+
+\section{Data Flow for Live Mode}
+Live mode uses the same sensor-acquisition path but does not append raw samples to
+the training CSV. Once a 50-sample buffer is complete, the ESP32 runs KNN inference
+for every sample. The label with the highest batch vote is selected, and confidence
+is calculated as
+\begin{equation}
+C = \frac{V_{\mathrm{winner}}}{N},
+\end{equation}
+where $V_{\mathrm{winner}}$ is the winning vote count and $N$ is the number of
+samples in the batch.
+
+The ESP32 updates the OLED and buzzer locally, prints the result to the serial
+monitor, and sends the prediction to the live-prediction endpoint. The browser
+dashboard receives the latest status through the FastAPI service. This mode keeps
+the classification decision on the ESP32 and prevents predicted labels from being
+mistaken for ground-truth training labels.
+
+Figure~\ref{fig:live-mode-flow} illustrates the live prediction process.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{Graphics/live_mode_flow.png}
+\caption{Live-mode flow.}
+\label{fig:live-mode-flow}
+\end{figure}
+
+\section{Block Diagram for Training the KNN Model}
+The KNN training pipeline begins with labeled CSV data and ends with an embedded
+header file. The major stages are:
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.72\textwidth]{Graphics/knn_training_pipeline.png}
+\caption{KNN model training pipeline.}
+\label{fig:knn-training-pipeline}
+\end{figure}
+
+\begin{enumerate}
+	\item read the selected training CSV;
+	\item remove repeated headers and invalid sensor rows;
+	\item separate the twelve sensor features from the metadata and label;
+	\item calculate the mean and scale of each feature;
+	\item standardize the feature values;
+	\item select representative prototypes for every label;
+	\item evaluate different values of $k$ and prototype counts; and
+	\item generate \texttt{knn\_model.h} for the ESP32.
+\end{enumerate}
+
+For a feature $x_i$, standardization is performed using
+\begin{equation}
+z_i = \frac{x_i-\mu_i}{\sigma_i},
+\end{equation}
+where $\mu_i$ and $\sigma_i$ are calculated from the training prototypes. The
+generated header stores normalized prototypes, labels, means, and scales in program
+memory. The ESP32 therefore performs inference without Python or a separate
+machine-learning library.
+
+\subsection{Training Dataset}
+The current dataset is collected directly from the ESP32 and contains timestamped
+records with user, exercise, posture, combined label, and twelve sensor features.
+The implemented training scope is bicep curls and squats. Push-ups and other
+exercises can be supported later by collecting their labeled good and bad posture
+records and rerunning the training pipeline.
+
+\subsection{Model Evaluation}
+The notebook uses a stratified validation split so every available class is
+represented in training and validation data. It compares multiple values of $k$
+and different prototype counts. Performance is reported using accuracy, precision,
+recall, F1-score, a parameter-performance graph, and a normalized confusion matrix.
+
+\section{Application Deployment}
+The ESP32 firmware is compiled and uploaded using Arduino IDE. The sketch contains
+the sensor collector, KNN model interface, OLED and buzzer logic, Wi-Fi connection,
+and web-server handlers. The generated \texttt{knn\_model.h} file must be kept in
+the same Arduino sketch folder as the firmware files.
+
+The FastAPI application runs on a computer connected to the same local network as
+the ESP32. The server receives collection batches at
+\texttt{/api/sensor-data}, accepts live predictions at the live-prediction endpoint,
+and serves the dashboard from the root URL. The ESP32's server address must use the
+computer's local network IP address rather than \texttt{localhost}.
+
+Figure~\ref{fig:application-deployment} illustrates the deployment arrangement.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{Graphics/deployment_diagram.png}
+\caption{Application deployment diagram.}
+\label{fig:application-deployment}
+\end{figure}
+
+\section{System Evaluation}
+The integrated prototype is evaluated in the following order:
+\begin{enumerate}
+	\item verify that both MPU6050 sensors respond at their configured I2C addresses;
+	\item verify that the ESP32 connects to Wi-Fi and reaches the FastAPI server;
+	\item check that collection batches contain valid timestamps, labels, and twelve features;
+	\item compare KNN predictions with the known exercise and posture condition;
+	\item check repetition counts against manually counted movement cycles;
+	\item verify OLED, buzzer, serial, and dashboard feedback; and
+	\item measure classification accuracy, posture precision and recall, confidence, update delay, and communication reliability.
+\end{enumerate}
+
+This evaluation distinguishes model errors from hardware, network, and user-interface
+errors. It also provides a clear baseline for improving the model when additional
+users or exercises are added.

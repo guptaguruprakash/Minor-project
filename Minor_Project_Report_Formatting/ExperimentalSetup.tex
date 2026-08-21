@@ -1,0 +1,33 @@
+\chapter{EXPERIMENTAL SETUP}
+
+\section{Sensor Configuration}
+The experimental setup uses two \textbf{MPU6050 inertial sensors} connected to the \textbf{ESP32}
+through the I2C bus. The first sensor uses address \texttt{0x68} and the second
+uses address \texttt{0x69}. Together, the sensors provide three acceleration and
+three gyroscope readings each, forming a twelve-feature input vector for the \textbf{KNN
+classifier}. Samples are collected every 20 milliseconds, giving an approximate
+sampling rate of \textbf{50 samples per second}.
+
+\section{Hardware Configuration}
+The hardware setup consists of an \textbf{ESP32 development board}, two \textbf{MPU6050 modules},
+an \textbf{SH1106 OLED display}, and a \textbf{buzzer}. The ESP32 performs sensor acquisition,
+feature standardization, \textbf{KNN inference}, repetition counting, and \textbf{Wi-Fi}
+communication. The OLED displays the exercise, posture, confidence, and system
+status, while the buzzer provides immediate feedback when bad posture is detected.
+
+\section{Software Environment}
+The ESP32 firmware is developed and uploaded using the Arduino IDE. It includes
+the sensor collector, double-buffered batch processing, embedded KNN model,
+display and buzzer control, Wi-Fi connection, and web-server handlers. The KNN
+model is trained with Python from labeled CSV data and exported to
+\texttt{knn\_model.h}. A FastAPI application receives collected sensor batches,
+stores labeled records, accepts live predictions, and provides the web dashboard.
+
+\section{Data Collection Setup}
+For each experiment, the sensors are attached consistently to the user's body and
+the exercise and posture labels are selected before recording. The ESP32 collects
+50 samples per batch. In collection mode, each completed batch is serialized as
+JSON and sent to the FastAPI service, which validates and stores the records in
+CSV format. The resulting dataset is used to train and evaluate the KNN model for
+bicep curls and squats.
+
