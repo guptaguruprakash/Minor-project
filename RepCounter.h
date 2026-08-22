@@ -6,6 +6,7 @@
 enum RepExercise : uint8_t {
   REP_EXERCISE_SQUAT = 0,
   REP_EXERCISE_BICEP = 1,
+  REP_EXERCISE_PUSHUP = 2,
 };
 
 enum RepState : uint8_t {
@@ -19,8 +20,11 @@ struct RepCounterConfig {
   float movementThreshold = 12.0f;
   float peakThreshold = 20.0f;
   float hysteresisThreshold = 5.0f;
+  float baselineAdaptRate = 0.05f;
   uint32_t minimumRepDurationMs = 400;
   uint32_t minimumTimeBetweenRepsMs = 700;
+  uint32_t maxRepDurationMs = 3000;
+  uint8_t returnConfirmSamples = 2;
   uint32_t baselineUpdateIntervalMs = 1000;
 };
 
@@ -40,6 +44,7 @@ class RepCounter {
     peakExcursion_ = 0.0f;
     initialized_ = false;
     peakSeen_ = false;
+    returnConfirmCount_ = 0;
     movementStartedAt_ = 0;
     lastRepetitionAt_ = 0;
     lastBaselineUpdateAt_ = 0;
@@ -50,15 +55,28 @@ class RepCounter {
       exercise_ = exercise;
       state_ = REP_IDLE;
       peakSeen_ = false;
+      returnConfirmCount_ = 0;
     }
   }
 
   uint16_t update(float signal, uint32_t timestampMs, bool classifierActive) {
+    const uint8_t requiredReturnSamples =
+      config_.returnConfirmSamples == 0 ? 1 : config_.returnConfirmSamples;
+
     if (!initialized_) {
       filteredSignal_ = signal;
       baseline_ = signal;
       initialized_ = true;
       lastBaselineUpdateAt_ = timestampMs;
+      return repetitions_;
+    }
+
+    if (state_ != REP_IDLE &&
+        timestampMs - movementStartedAt_ > config_.maxRepDurationMs) {
+      state_ = REP_IDLE;
+      peakExcursion_ = 0.0f;
+      peakSeen_ = false;
+      returnConfirmCount_ = 0;
       return repetitions_;
     }
 
@@ -72,7 +90,7 @@ class RepCounter {
     if (state_ == REP_IDLE) {
       if (timestampMs - lastBaselineUpdateAt_ >= config_.baselineUpdateIntervalMs &&
           !classifierActive) {
-        baseline_ += 0.05f * (filteredSignal_ - baseline_);
+        baseline_ += config_.baselineAdaptRate * (filteredSignal_ - baseline_);
         lastBaselineUpdateAt_ = timestampMs;
       }
       if (canStart && timestampMs - lastRepetitionAt_ >= config_.minimumTimeBetweenRepsMs) {
@@ -80,6 +98,7 @@ class RepCounter {
         movementStartedAt_ = timestampMs;
         peakExcursion_ = excursion;
         peakSeen_ = excursion >= config_.peakThreshold;
+        returnConfirmCount_ = 0;
       }
       return repetitions_;
     }
@@ -91,11 +110,23 @@ class RepCounter {
       if (peakExcursion_ >= config_.peakThreshold) {
         peakSeen_ = true;
         state_ = REP_RETURNING;
+        returnConfirmCount_ = 0;
       }
       return repetitions_;
     }
 
-    if (state_ == REP_RETURNING && hasReturned) {
+    if (state_ == REP_RETURNING) {
+      if (hasReturned) {
+        if (returnConfirmCount_ < requiredReturnSamples) {
+          ++returnConfirmCount_;
+        }
+      } else {
+        returnConfirmCount_ = 0;
+      }
+    }
+
+    if (state_ == REP_RETURNING &&
+      returnConfirmCount_ >= requiredReturnSamples) {
       const uint32_t duration = timestampMs - movementStartedAt_;
       if (peakSeen_ && duration >= config_.minimumRepDurationMs &&
           timestampMs - lastRepetitionAt_ >= config_.minimumTimeBetweenRepsMs) {
@@ -105,6 +136,7 @@ class RepCounter {
       state_ = REP_IDLE;
       peakExcursion_ = 0.0f;
       peakSeen_ = false;
+      returnConfirmCount_ = 0;
     }
     return repetitions_;
   }
@@ -125,6 +157,7 @@ class RepCounter {
   float peakExcursion_;
   bool initialized_;
   bool peakSeen_;
+  uint8_t returnConfirmCount_;
   uint32_t movementStartedAt_;
   uint32_t lastRepetitionAt_;
   uint32_t lastBaselineUpdateAt_;

@@ -11,6 +11,10 @@ FEATURE_NAMES = (
     "ax1", "ay1", "az1", "gx1", "gy1", "gz1",
     "ax2", "ay2", "az2", "gx2", "gy2", "gz2",
 )
+CSV_HEADERS = (
+    "received_at", "timestamp", "user", "exercise", "posture", "label",
+    *FEATURE_NAMES,
+)
 DEFAULT_FILES = ("data/train.csv",)
 DEFAULT_PROTOTYPES_PER_LABEL = 64
 K_NEIGHBORS = 5
@@ -22,9 +26,9 @@ def load_rows(paths):
         with path.open(newline="", encoding="utf-8") as csv_file:
             reader = csv.DictReader(csv_file)
             for row in reader:
-                label = row.get("label", "").strip()
-                if label == "label":
+                if [row.get(name, "").strip() for name in CSV_HEADERS] == list(CSV_HEADERS):
                     continue
+                label = row.get("label", "").strip()
                 if label:
                     rows.append((label, [float(row[name]) for name in FEATURE_NAMES]))
     if not rows:

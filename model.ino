@@ -11,6 +11,10 @@ const char* knnExerciseName(uint8_t label) {
 			return "bicep";
 		case SmartGymKnn::LABEL_BICEP_IDLE:
 			return "bicep";
+		case SmartGymKnn::LABEL_PUSHUP_BAD:
+		case SmartGymKnn::LABEL_PUSHUP_GOOD:
+		case SmartGymKnn::LABEL_PUSHUP_IDLE:
+			return "pushup";
 		case SmartGymKnn::LABEL_SQUAT_BAD:
 		case SmartGymKnn::LABEL_SQUAT_GOOD:
 		case SmartGymKnn::LABEL_SQUAT_IDLE:
@@ -27,8 +31,12 @@ const char* knnPostureName(uint8_t label) {
 		case SmartGymKnn::LABEL_BICEP_GOOD:
 		case SmartGymKnn::LABEL_BICEP_IDLE:
 			return label == SmartGymKnn::LABEL_BICEP_IDLE ? "idle" : "good";
+		case SmartGymKnn::LABEL_PUSHUP_BAD:
 		case SmartGymKnn::LABEL_SQUAT_BAD:
 			return "bad";
+		case SmartGymKnn::LABEL_PUSHUP_GOOD:
+		case SmartGymKnn::LABEL_PUSHUP_IDLE:
+			return label == SmartGymKnn::LABEL_PUSHUP_IDLE ? "idle" : "good";
 		case SmartGymKnn::LABEL_SQUAT_GOOD:
 			return "good";
 		case SmartGymKnn::LABEL_SQUAT_IDLE:
